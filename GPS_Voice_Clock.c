@@ -533,6 +533,7 @@ void play_file(char *filename) {
 		LED_PORT.OUTSET = SD_ERR_bm;
 		return;
 	}
+	if (cnt == 0) return; // no actual data - so the first block was the end.
 	EDMA.CH2.TRFCNT = cnt;
 	EDMA.CH2.CTRLA |= EDMA_CH_REPEAT_bm; // take over from the first channel
 	if (cnt == sizeof(audio_buf[1])) {
@@ -657,7 +658,6 @@ void __ATTR_NORETURN__ main(void) {
         EDMA.CH0.DESTADDRCTRL = EDMA_CH_RELOAD_BURST_gc | EDMA_CH_DIR_INC_gc;
         EDMA.CH0.TRIGSRC = EDMA_CH_TRIGSRC_DACA_CH0_gc;
         EDMA.CH0.DESTADDR = (unsigned int)&(DACA.CH0DATA);
-        EDMA.CH0.TRFCNT = sizeof(audio_buf[0]);
         EDMA.CH0.ADDR = (unsigned int)&(audio_buf[0]);
 
         // Channel 2 is configured exactly the same way as channel 0, but with the 2nd memory buffer.
@@ -667,7 +667,6 @@ void __ATTR_NORETURN__ main(void) {
         EDMA.CH2.DESTADDRCTRL = EDMA_CH_RELOAD_BURST_gc| EDMA_CH_DIR_INC_gc;
         EDMA.CH2.TRIGSRC = EDMA_CH_TRIGSRC_DACA_CH0_gc;
         EDMA.CH2.DESTADDR = (unsigned int)&(DACA.CH0DATA);
-        EDMA.CH2.TRFCNT = sizeof(audio_buf[1]);
         EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
 
 	ticks_cnt = 0;
@@ -726,12 +725,17 @@ void __ATTR_NORETURN__ main(void) {
 				LED_PORT.OUTSET = SD_ERR_bm;
 				continue;
 			}
+			if (cnt == 0) {
+				// There was no data in the final read, so don't bother with it.
+				playing = 0;
+				continue;
+			}
 			(chan?&(EDMA.CH2):&(EDMA.CH0))->TRFCNT = cnt;
-			if (cnt == sizeof(audio_buf[chan])) {
-				// we're not done yet, so set this buffer to continue
-				(chan?&(EDMA.CH2):&(EDMA.CH0))->CTRLA |= EDMA_CH_REPEAT_bm; // repeat
-                	} else {
-				// we are done. Stop paying attention.
+			(chan?&(EDMA.CH2):&(EDMA.CH0))->CTRLA |= EDMA_CH_REPEAT_bm; // continue with this buffer
+			if (cnt != sizeof(audio_buf[chan])) {
+				// This is the last audio chunk, so we are done. Stop paying attention.
+				// DMA will stop after this buffer plays because the other one won't have had
+				// REPEAT turned on.
 				playing = 0;
 			}
 			continue;
