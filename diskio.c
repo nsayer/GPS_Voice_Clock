@@ -1,24 +1,30 @@
-/*-----------------------------------------------------------------------*/
-/* Low level disk I/O module skeleton for Petit FatFs (C)ChaN, 2014      */
-/*-----------------------------------------------------------------------*/
+/*
+
+    GPS Voice Clock
+    Copyright (C) 2018 Nicholas W. Sayer
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+    
+  */
+
+// This file is the implementation of the Petit FAT FS Disk I/O
+// skeleton for SD card I/O over SPI.
 
 #include <avr/io.h>
-#include <util/atomic.h>
+#include "GPS_Voice_Clock.h"
 #include "diskio.h"
-
-// Timer ticks per second - turns out that our millisecond timer runs at 2 kHz
-#define F_TICK (2000U)
-
-extern unsigned long millis();
-
-// outputs
-// Port C - !CS
-#define CRDCS_bm _BV(4)
-// Pord D - !PWR
-#define CRDPWR_bm _BV(0)
-
-#define ASSERT_CS (PORTC.OUTCLR = CRDCS_bm)
-#define DEASSERT_CS (PORTC.OUTSET = CRDCS_bm)
 
 static inline __attribute__ ((always_inline)) unsigned char SPI_byte(unsigned char data) {
 	SPIC.DATA = data;
@@ -28,14 +34,14 @@ static inline __attribute__ ((always_inline)) unsigned char SPI_byte(unsigned ch
 
 static unsigned char waitForStart(unsigned int timeout) {
         unsigned char byte;
-        for(unsigned long now = millis(); millis() - now < timeout; ) {
+        for(unsigned long now = ticks(); ticks() - now < timeout; ) {
                 if ((byte = SPI_byte(0xff)) != 0xff) break;
         }
         return (byte != 0xfe);
 }
 
 static unsigned char waitForIdle(unsigned int timeout) {
-        for(unsigned long now = millis(); millis() - now < timeout; ) {
+        for(unsigned long now = ticks(); ticks() - now < timeout; ) {
                 if (SPI_byte(0xff) == 0xff) return 0; //idle
         }
         return 1; // timeout
@@ -80,7 +86,7 @@ static unsigned char sendCommand_R1(unsigned char cmd, unsigned long arg) {
                         break;
         }
         response = 0xff;
-        for(unsigned long now = millis(); millis() - now < CMD_TIMEOUT; ) {
+        for(unsigned long now = ticks(); ticks() - now < CMD_TIMEOUT; ) {
                 response = SPI_byte(0xff);
                 if (!(response & 0x80)) break;
         }
@@ -99,8 +105,8 @@ DSTATUS disk_initialize (void)
 	SPIC.CTRL = SPI_ENABLE_bm | SPI_MASTER_bm | SPI_MODE_0_gc | SPI_PRESCALER_DIV128_gc;
 
 	DEASSERT_CS;
-	PORTD.OUTCLR = CRDPWR_bm; // power on the card
-	for(unsigned long now = millis(); millis() - now < PWR_TIMEOUT; );
+	SDPWR_ON;
+	for(unsigned long now = ticks(); ticks() - now < PWR_TIMEOUT; );
 
 	for(int i = 0; i < 10; i++) // send 80 clocks
 		SPI_byte(0xff);
@@ -108,7 +114,7 @@ DSTATUS disk_initialize (void)
 	ASSERT_CS;
 
 	unsigned char init_success = 0;
-	for(unsigned long now = millis(); millis() - now < INIT_TIMEOUT; ) {
+	for(unsigned long now = ticks(); ticks() - now < INIT_TIMEOUT; ) {
 		if (sendCommand_R1(0, 0) == R1_IDLE_STATE) {
 			init_success = 1;
 			break;
@@ -125,7 +131,7 @@ DSTATUS disk_initialize (void)
 	if ((r3resp & 0xff) != 0xaa) { stat = STA_NOINIT; goto fail; }
 
 	init_success = 0;
-	for(unsigned long now = millis(); millis() - now < INIT_TIMEOUT; ) {
+	for(unsigned long now = ticks(); ticks() - now < INIT_TIMEOUT; ) {
 		sendCommand_R1(55, 0);
 		if (sendCommand_R1(41, 0x40000000UL) == R1_READY_STATE) {
 			init_success = 1;

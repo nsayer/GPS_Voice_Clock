@@ -32,6 +32,7 @@
 #include <avr/pgmspace.h>
 #include <util/atomic.h>
 
+#include "GPS_Voice_Clock.h"
 #include "pff.h"
 
 // 32 MHz
@@ -40,17 +41,6 @@
 // CLK2X = 0. For 9600 baud @ 32 MHz: 
 #define BSEL (12)
 #define BSCALE (4)
-
-// Port C is the serial port, switches and PPS.
-
-// The button
-#define PORT_SW PORTA.IN
-#define BTN_0_bm _BV(0)
-
-// The diagnostic LEDs
-#define LED_PORT PORTD
-#define GPS_ERR_bm _BV(6)
-#define SD_ERR_bm _BV(7)
 
 // The serial buffer length
 #define RX_BUF_LEN (96)
@@ -71,16 +61,7 @@
 #define DST_US 1
 #define DST_MODE_MAX DST_US
 
-// The possible values for tz
-#define TZ_UTC 0
-#define TZ_PAC 1
-#define TZ_MTN 2
-#define TZ_CEN 3
-#define TZ_EAS 4
-#define TZ_AK 5
-#define TZ_HI 6
-
-// This is the milli timer frequency - how fast millis_cnt ticks
+// This is the ticks timer frequency - how fast ticks_cnt ticks
 // Keep this synced with the configuration of Timer D5!
 #define F_TICK (2000U)
 
@@ -109,8 +90,8 @@ volatile unsigned int tx_buf_head, tx_buf_tail;
 volatile unsigned char rx_str_len;
 volatile unsigned char nmea_ready;
 
-volatile unsigned long millis_cnt;
-volatile unsigned long second_start_milli;
+volatile unsigned long ticks_cnt;
+volatile unsigned long second_start_tick;
 
 volatile unsigned char gps_locked;
 unsigned char dst_mode;
@@ -127,7 +108,14 @@ char intro_filename[16], hour_filename[16], minute_filename[16], second_filename
 
 FATFS fatfs;
 
-static const unsigned char month_tweak[] PROGMEM = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+// The possible values for tz
+#define TZ_UTC 0
+#define TZ_PAC 1
+#define TZ_MTN 2
+#define TZ_CEN 3
+#define TZ_EAS 4
+#define TZ_AK 5
+#define TZ_HI 6
 
 // The first letter of the intro filename is the zone.
 static const char zone_letters[] PROGMEM = "UPMCEAHU";
@@ -140,6 +128,8 @@ static inline char tz_letter() {
 static inline char tz_hour() {
 	return pgm_read_byte(&(zone_hours[tz & 7]));
 }
+
+static const unsigned char month_tweak[] PROGMEM = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
 
 static inline unsigned char first_sunday(unsigned char m, unsigned int y) {
 	// first, what's the day-of-week for the first day of whatever month?
@@ -415,17 +405,17 @@ static inline void handleGPS(const unsigned char *rx_sentence, const unsigned in
 	}
 }
 
-// milli counter ISR
+// ticks counter ISR
 ISR(TCD5_OVF_vect) {
 	TCD5.INTFLAGS = TC5_OVFIF_bm; // ack
-	millis_cnt++;
+	ticks_cnt++;
 }
 
 // PPS ISR
 ISR(PORTC_INT_vect) {
 	PORTC.INTFLAGS = _BV(0); // ack
 
-	second_start_milli = millis_cnt;
+	second_start_tick = ticks_cnt;
 	if (gps_locked) {
 		PORTD.OUTSET = _BV(4); // turn on the tick
 	}
@@ -481,16 +471,16 @@ static inline void tx_char(const unsigned char c) {
 	USARTC0.CTRLA |= USART_DREINTLVL_LO_gc; // enable the TX interrupt. If it was disabled, then it will trigger one now.
 }
 
-unsigned long millis() {
+unsigned long ticks() {
 	unsigned long out;
 	ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-		out = millis_cnt;
+		out = ticks_cnt;
 	}
 	return out;
 }
 
 static unsigned char check_button() {
-	unsigned long now = millis();
+	unsigned long now = ticks();
 	if (debounce_time != 0 && now - debounce_time < DEBOUNCE_TICKS) {
 		// We don't pay any attention to the buttons during debounce time.
 		return 0;
@@ -599,7 +589,7 @@ void __ATTR_NORETURN__ main(void) {
 	PORTC.INTCTRL = PORT_INTLVL_MED_gc;
 	PORTC.INTMASK = _BV(0);
 
-	PORTD.OUTSET = _BV(0) | _BV(1); // start with SD power and audio turned off
+	PORTD.OUTSET = CRDPWR_bm | AUPWR_bm; // start with SD power and audio turned off
 	PORTD.DIRSET = _BV(0) | _BV(1) | _BV(6) | _BV(7); // power switches and LEDS are out
 
 	rx_str_len = 0;
@@ -680,7 +670,7 @@ void __ATTR_NORETURN__ main(void) {
         EDMA.CH2.TRFCNT = sizeof(audio_buf[1]);
         EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
 
-	millis_cnt = 0;
+	ticks_cnt = 0;
 	utc_ref_year = 0;
 	gps_locked = 0;
 	debounce_time = 0;
@@ -695,8 +685,8 @@ void __ATTR_NORETURN__ main(void) {
         PMIC.CTRL = PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm | PMIC_HILVLEN_bm;
         sei();
 
-	unsigned char cfg = (PORT_SW & 0xf0) >> 4;
-	cfg ^= 0xf; // switches are inverse
+	// Switches are inverted. Flip them and shift them.
+	unsigned char cfg = (PORT_SW ^ DIPSW_gm) >> DIPSW_gp;
 	dst_mode = (cfg & 0x8)?DST_US:DST_OFF;
 	tz = cfg & 0x7;
 	if (tz == TZ_UTC) dst_mode = DST_OFF; // no DST for UTC.
@@ -754,9 +744,9 @@ void __ATTR_NORETURN__ main(void) {
 			continue;
 		}
 
-		unsigned long millis_in_second = millis() - second_start_milli;
+		unsigned long ticks_in_second = ticks() - second_start_tick;
 		unsigned long ticklen = second_in_block == 0?BEEP_TICKS:TICK_TICKS;
-		if (millis_in_second > ticklen) {
+		if (ticks_in_second > ticklen) {
 			PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
 		}
 		switch(second_in_block) {
@@ -777,7 +767,7 @@ void __ATTR_NORETURN__ main(void) {
 
 		unsigned char button = check_button();
 		if (button) {
-			PORTD.OUTTGL = _BV(1); // toggle the audio on and off
+			PORTD.OUTTGL = AUPWR_bm; // toggle the audio on and off
 		}
 	}
 	__builtin_unreachable();
