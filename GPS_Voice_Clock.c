@@ -132,17 +132,13 @@ static const unsigned char month_tweak[] PROGMEM = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6
 // The first letter of the intro filename is the zone.
 static const char zone_letters[] PROGMEM = "UPMCEAHU";
 
-static inline unsigned char tz_hour() {
-	switch(tz) {
-		default:
-		case TZ_UTC: return 0;
-		case TZ_PAC: return -8;
-		case TZ_MTN: return -7;
-		case TZ_CEN: return -6;
-		case TZ_EAS: return -5;
-		case TZ_AK: return -9;
-		case TZ_HI: return -10;
-	}
+static const char zone_hours[] PROGMEM = {0, -8, -7, -6, -5, -9, -10, 0};
+
+static inline char tz_letter() {
+	return pgm_read_byte(&(zone_letters[tz & 7]));
+}
+static inline char tz_hour() {
+	return pgm_read_byte(&(zone_hours[tz & 7]));
 }
 
 static inline unsigned char first_sunday(unsigned char m, unsigned int y) {
@@ -253,9 +249,9 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 	// during second zero of the block, which is reserved for the beep.
 	if (tz == TZ_UTC) {
 		// UTC has no DST.
-		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c"), pgm_read_byte(&(zone_letters[tz])));
+		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c"), tz_letter());
 	} else {
-		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c%c"), pgm_read_byte(&(zone_letters[tz])), dst_offset?'D':'S');
+		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c%c"), tz_letter());
 	}
 	snprintf(hour_filename, sizeof(hour_filename), P("/HOUR/%d"), h);
 	snprintf(minute_filename, sizeof(minute_filename), P("/MINUTE/%d"), m);
