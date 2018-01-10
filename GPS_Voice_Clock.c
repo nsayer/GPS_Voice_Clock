@@ -94,6 +94,8 @@ volatile unsigned long ticks_cnt;
 volatile unsigned long second_start_tick;
 
 volatile unsigned char gps_locked;
+volatile unsigned char new_second;
+
 unsigned char dst_mode;
 unsigned char tz;
 unsigned long debounce_time;
@@ -416,6 +418,7 @@ ISR(PORTC_INT_vect) {
 	PORTC.INTFLAGS = _BV(0); // ack
 
 	second_start_tick = ticks_cnt;
+	new_second = 1;
 	if (gps_locked) {
 		PORTD.OUTSET = _BV(4); // turn on the tick
 	}
@@ -675,6 +678,8 @@ void __ATTR_NORETURN__ main(void) {
 	debounce_time = 0;
 	button_down = 0;
 	second_in_block = 0;
+	second_start_tick = 0;
+	new_second = 0;
 	playing = 0;
 	*intro_filename = 0;
 	*hour_filename = 0;
@@ -698,7 +703,11 @@ void __ATTR_NORETURN__ main(void) {
 	}
 
 	while(1) {
+		// The big, main loop. Our tasks:
+		// 1. Pet the watchdog
 		wdt_reset();
+
+		// 2. Handle serial sentence completions
 		if (nmea_ready) {
 			// We're doing this here to get the heavy processing
 			// out of an ISR. It *is* a lot of work, after all.
@@ -713,10 +722,14 @@ void __ATTR_NORETURN__ main(void) {
 			continue;
 		}
 
-		if (playing && !(EDMA.INTFLAGS & (EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm))) {
-			// which channel is free?
+		// 3. Fill completed audio buffers if background audio playback is in progress
+		if (EDMA.INTFLAGS & (EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm)) {
+			// A DMA transfer completed, so we must at least ACK it.
+			// which channel?
 			unsigned char chan = (EDMA.INTFLAGS & EDMA_CH0TRNFIF_bm)?0:1;
-                	EDMA.INTFLAGS |= EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm; // ack
+                	EDMA.INTFLAGS |= chan?EDMA_CH2TRNFIF_bm:EDMA_CH0TRNFIF_bm; // ack
+
+			if (!playing) continue; // This just means the last block finished.
 
 			unsigned int cnt;
 			if (pf_read((void*)(audio_buf[chan]), sizeof(audio_buf[chan]), &cnt)) {
@@ -741,6 +754,7 @@ void __ATTR_NORETURN__ main(void) {
 			continue;
 		}
 
+		// 4. Track GPS status on the GPS lock LED
 		if (gps_locked) {
 			LED_PORT.OUTCLR = GPS_ERR_bm;
 		} else {
@@ -748,27 +762,34 @@ void __ATTR_NORETURN__ main(void) {
 			continue;
 		}
 
+		// 5. End the tick or beep that was started by the PPS ISR
 		unsigned long ticks_in_second = ticks() - second_start_tick;
 		unsigned long ticklen = second_in_block == 0?BEEP_TICKS:TICK_TICKS;
 		if (ticks_in_second > ticklen) {
 			PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
 		}
-		switch(second_in_block) {
-			case 1: // "At the tone..." intro for timezone
-				play_file(intro_filename);
-				break;
-			case 5: // "10 hours"
-				play_file(hour_filename);
-				break;
-			case 6: // "57 minutes"
-				play_file(minute_filename);
-				break;
-			case 7: // "Exactly."
-				play_file(second_filename);
-				break;
+
+		// 6. If this is a new second (set by PPS ISR), then kick off scheduled playback events
+		if (new_second) {
+			new_second = 0;
+			switch(second_in_block) {
+				case 1: // "At the tone..." intro for timezone
+					play_file(intro_filename);
+					break;
+				case 5: // "10 hours"
+					play_file(hour_filename);
+					break;
+				case 6: // "57 minutes"
+					play_file(minute_filename);
+					break;
+				case 7: // "Exactly."
+					play_file(second_filename);
+					break;
+			}
+			continue;
 		}
 
-
+		// 7. Check the button for user interactions
 		unsigned char button = check_button();
 		if (button) {
 			PORTD.OUTTGL = AUPWR_bm; // toggle the audio on and off
