@@ -241,7 +241,7 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 		// UTC has no DST.
 		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c"), tz_letter());
 	} else {
-		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c%c"), tz_letter());
+		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c%c"), tz_letter(), dst_offset?'D':'S');
 	}
 	snprintf(hour_filename, sizeof(hour_filename), P("/HOUR/%d"), h);
 	snprintf(minute_filename, sizeof(minute_filename), P("/MINUTE/%d"), m);
