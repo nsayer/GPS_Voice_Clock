@@ -41,7 +41,7 @@ number and units. As a special case, the 0 seconds file should simply say "Exact
 The audio files are little-endian 16 bit unsigned 8 kHz mono raw audio samples. You can create them from some other format with sox. The
 command line arguments for the output should be -t raw -c 1 -e unsigned -b 16 -r 8000.
 
-The SD.ZIP file in this repository can be unpacked into the top directory of a suitably formatted card.
+The SD_audio.zip file in this repository can be unpacked into the top directory of a suitably formatted card.
 
 The card cannot be hot-swapped. Remove the card only when the board is off. The current firmware cannot recover from SD mounting errors
 without being power-cycled.
