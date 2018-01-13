@@ -520,6 +520,8 @@ void play_file(char *filename) {
 		LED_PORT.OUTSET = SD_ERR_bm;
 		return;
 	}
+	if (!cnt) return; // empty file - we're done
+
 	EDMA.CH0.TRFCNT = cnt;
 	EDMA.CH0.CTRLA |= EDMA_CH_ENABLE_bm; // start
         if (cnt != sizeof(audio_buf[0])) {
@@ -532,7 +534,7 @@ void play_file(char *filename) {
 		LED_PORT.OUTSET = SD_ERR_bm;
 		return;
 	}
-	if (cnt == 0) return; // no actual data - so the first block was the end.
+	if (!cnt) return; // no actual data - so the first block was the end.
 	EDMA.CH2.TRFCNT = cnt;
 	EDMA.CH2.CTRLA |= EDMA_CH_REPEAT_bm; // take over from the first channel
 	if (cnt == sizeof(audio_buf[1])) {
