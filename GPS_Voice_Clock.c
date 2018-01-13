@@ -61,12 +61,8 @@
 #define DST_US 1
 #define DST_MODE_MAX DST_US
 
-// This is the ticks timer frequency - how fast ticks_cnt ticks
-// Keep this synced with the configuration of Timer D5!
-#define F_TICK (2000U)
-
 // We want something like 50 ms.
-#define DEBOUNCE_TICKS (20 * (F_TICK / 1000))
+#define DEBOUNCE_TICKS (50 * (F_TICK / 1000))
 
 // The ticks on seconds 1-9 are 25 ms long
 #define TICK_TICKS (25 * (F_TICK / 1000))
@@ -92,9 +88,9 @@ volatile unsigned char nmea_ready;
 
 volatile unsigned long ticks_cnt;
 volatile unsigned long second_start_tick;
+volatile unsigned char new_second;
 
 volatile unsigned char gps_locked;
-volatile unsigned char new_second;
 
 unsigned char dst_mode;
 unsigned char tz;

@@ -139,7 +139,7 @@ DSTATUS disk_initialize (void)
 		}
 	}
 	if (!init_success) { stat = STA_NOINIT; goto fail; }
-	SPIC.CTRL = SPI_CLK2X_bm | SPI_ENABLE_bm | SPI_MASTER_bm | SPI_MODE_0_gc; // Full speed!
+	SPIC.CTRL = SPI_CLK2X_bm | SPI_ENABLE_bm | SPI_MASTER_bm | SPI_MODE_0_gc | SPI_PRESCALER_DIV4_gc; // Full speed!
 	// fall through
 
 fail:

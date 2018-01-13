@@ -22,6 +22,7 @@
 extern unsigned long ticks();
 
 // how many times does ticks() increment per second?
+// Keep this synced with the configuration of Timer D5!
 #define F_TICK (2000U)
 
 // outputs
