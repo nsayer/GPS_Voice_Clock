@@ -64,8 +64,8 @@
 // We want something like 50 ms.
 #define DEBOUNCE_TICKS (50 * (F_TICK / 1000))
 
-// The ticks on seconds 1-9 are 25 ms long
-#define TICK_TICKS (25 * (F_TICK / 1000))
+// The ticks on seconds 1-9 are 10 ms long
+#define TICK_TICKS (10 * (F_TICK / 1000))
 
 // The beep on second 0 is 500 ms long
 #define BEEP_TICKS (500 * (F_TICK / 1000))
@@ -97,6 +97,7 @@ unsigned char tz;
 unsigned long debounce_time;
 unsigned char button_down;
 unsigned char second_in_block;
+unsigned char tick_cleared;
 unsigned int utc_ref_year;
 unsigned char utc_ref_mon;
 unsigned char utc_ref_day;
@@ -416,7 +417,7 @@ ISR(PORTC_INT_vect) {
 	second_start_tick = ticks_cnt;
 	new_second = 1;
 	if (gps_locked) {
-		PORTD.OUTSET = _BV(4); // turn on the tick
+		PORTD.DIRSET = _BV(4); // turn on the tick
 	}
 }
 
@@ -544,6 +545,15 @@ void play_file(char *filename) {
 	}
 }
 
+void read_switches(void) {
+	// Switches are inverted. Flip them and shift them.
+	unsigned char cfg = (PORT_SW ^ DIPSW_gm) >> DIPSW_gp;
+	dst_mode = (cfg & 0x8)?DST_US:DST_OFF;
+	tz = cfg & 0x7;
+	if (tz == 7) tz = 0; // special case
+	if (tz == TZ_UTC) dst_mode = DST_OFF; // no DST for UTC.
+}
+
 // main() never returns.
 void __ATTR_NORETURN__ main(void) {
 
@@ -562,7 +572,7 @@ void __ATTR_NORETURN__ main(void) {
 
 	//wdt_enable(WDTO_1S); // This is broken on XMegas.
 	// This replacement code doesn't disable interrupts (but they're not on now anyway)
-	_PROTECTED_WRITE(WDT.CTRL, WDT_PER_256CLK_gc | WDT_ENABLE_bm | WDT_CEN_bm);
+	_PROTECTED_WRITE(WDT.CTRL, WDT_PER_1KCLK_gc | WDT_ENABLE_bm | WDT_CEN_bm);
 	while(WDT.STATUS & WDT_SYNCBUSY_bm) ; // wait for it to take
 	// We don't want a windowed watchdog.
 	_PROTECTED_WRITE(WDT.WINCTRL, WDT_WCEN_bm);
@@ -678,6 +688,7 @@ void __ATTR_NORETURN__ main(void) {
 	second_in_block = 0;
 	second_start_tick = 0;
 	new_second = 0;
+	tick_cleared = 0;
 	playing = 0;
 	*intro_filename = 0;
 	*hour_filename = 0;
@@ -687,11 +698,7 @@ void __ATTR_NORETURN__ main(void) {
         PMIC.CTRL = PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm | PMIC_HILVLEN_bm;
         sei();
 
-	// Switches are inverted. Flip them and shift them.
-	unsigned char cfg = (PORT_SW ^ DIPSW_gm) >> DIPSW_gp;
-	dst_mode = (cfg & 0x8)?DST_US:DST_OFF;
-	tz = cfg & 0x7;
-	if (tz == TZ_UTC) dst_mode = DST_OFF; // no DST for UTC.
+	read_switches();
 
 	startUTCReferenceFetch();
 
@@ -761,16 +768,25 @@ void __ATTR_NORETURN__ main(void) {
 		}
 
 		// 5. End the tick or beep that was started by the PPS ISR
-		unsigned long ticks_in_second = ticks() - second_start_tick;
-		unsigned long ticklen = second_in_block == 0?BEEP_TICKS:TICK_TICKS;
-		if (ticks_in_second > ticklen) {
+		unsigned long ticks_in_second, ticklen;
+		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+			ticks_in_second = ticks() - second_start_tick;
+			ticklen = second_in_block == 0?BEEP_TICKS:TICK_TICKS;
+		}
+		if (ticks_in_second > ticklen && !tick_cleared) {
 			PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
+			tick_cleared = 1;
 		}
 
 		// 6. If this is a new second (set by PPS ISR), then kick off scheduled playback events
 		if (new_second) {
+
 			new_second = 0;
+			tick_cleared = 0;
 			switch(second_in_block) {
+				case 0: // configuration changes are only allowed at second-start.
+					read_switches();
+					break;
 				case 1: // "At the tone..." intro for timezone
 					play_file(intro_filename);
 					break;

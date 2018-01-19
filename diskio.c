@@ -23,6 +23,7 @@
 // skeleton for SD card I/O over SPI.
 
 #include <avr/io.h>
+#include <avr/wdt.h>
 #include "GPS_Voice_Clock.h"
 #include "diskio.h"
 
@@ -35,6 +36,7 @@ static inline __attribute__ ((always_inline)) unsigned char SPI_byte(unsigned ch
 static unsigned char waitForStart(unsigned int timeout) {
         unsigned char byte;
         for(unsigned long now = ticks(); ticks() - now < timeout; ) {
+		wdt_reset();
                 if ((byte = SPI_byte(0xff)) != 0xff) break;
         }
         return (byte != 0xfe);
@@ -42,6 +44,7 @@ static unsigned char waitForStart(unsigned int timeout) {
 
 static unsigned char waitForIdle(unsigned int timeout) {
         for(unsigned long now = ticks(); ticks() - now < timeout; ) {
+		wdt_reset();
                 if (SPI_byte(0xff) == 0xff) return 0; //idle
         }
         return 1; // timeout
@@ -107,6 +110,7 @@ DSTATUS disk_initialize (void)
 	DEASSERT_CS;
 	SDPWR_ON;
 	for(unsigned long now = ticks(); ticks() - now < PWR_TIMEOUT; );
+	wdt_reset();
 
 	for(int i = 0; i < 10; i++) // send 80 clocks
 		SPI_byte(0xff);
@@ -115,6 +119,7 @@ DSTATUS disk_initialize (void)
 
 	unsigned char init_success = 0;
 	for(unsigned long now = ticks(); ticks() - now < INIT_TIMEOUT; ) {
+		wdt_reset();
 		if (sendCommand_R1(0, 0) == R1_IDLE_STATE) {
 			init_success = 1;
 			break;
@@ -132,6 +137,7 @@ DSTATUS disk_initialize (void)
 
 	init_success = 0;
 	for(unsigned long now = ticks(); ticks() - now < INIT_TIMEOUT; ) {
+		wdt_reset();
 		sendCommand_R1(55, 0);
 		if (sendCommand_R1(41, 0x40000000UL) == R1_READY_STATE) {
 			init_success = 1;
