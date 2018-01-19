@@ -68,7 +68,7 @@
 #define TICK_TICKS (10 * (F_TICK / 1000))
 
 // The beep on second 0 is 500 ms long
-#define BEEP_TICKS (500 * (F_TICK / 1000))
+#define BEEP_TICKS (750 * (F_TICK / 1000))
 
 // Thanks to Gareth Evans at http://todbot.com/blog/2008/06/19/how-to-do-big-strings-in-arduino/
 // Note that you must be careful not to use this macro more than once per "statement", lest you
@@ -787,16 +787,16 @@ void __ATTR_NORETURN__ main(void) {
 				case 0: // configuration changes are only allowed at second-start.
 					read_switches();
 					break;
-				case 1: // "At the tone..." intro for timezone
+				case 2: // "At the tone..." intro for timezone
 					play_file(intro_filename);
 					break;
-				case 5: // "10 hours"
+				case 6: // "10 hours"
 					play_file(hour_filename);
 					break;
-				case 6: // "57 minutes"
+				case 7: // "57 minutes"
 					play_file(minute_filename);
 					break;
-				case 7: // "Exactly."
+				case 8: // "Exactly."
 					play_file(second_filename);
 					break;
 			}
