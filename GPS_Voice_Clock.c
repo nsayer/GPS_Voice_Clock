@@ -712,19 +712,15 @@ void __ATTR_NORETURN__ main(void) {
 		// 1. Pet the watchdog
 		wdt_reset();
 
-		// 2. Handle serial sentence completions
-		if (nmea_ready) {
-			// We're doing this here to get the heavy processing
-			// out of an ISR. It *is* a lot of work, after all.
-			// But this may take a long time, so we need to let
-			// the serial ISR keep working.
-			unsigned char temp_buf[RX_BUF_LEN];
-			unsigned int temp_len = rx_str_len;
-			memcpy(temp_buf, (const char *)rx_buf, temp_len);
-			rx_str_len = 0; // clear the buffer
-			nmea_ready = 0;
-			handleGPS(temp_buf, temp_len);
-			continue;
+		// 2. End the tick or beep that was started by the PPS ISR
+		unsigned long ticks_in_second, ticklen;
+		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+			ticks_in_second = ticks() - second_start_tick;
+			ticklen = second_in_block == 0?BEEP_TICKS:TICK_TICKS;
+		}
+		if (ticks_in_second > ticklen && !tick_cleared) {
+			PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
+			tick_cleared = 1;
 		}
 
 		// 3. Fill completed audio buffers if background audio playback is in progress
@@ -759,26 +755,36 @@ void __ATTR_NORETURN__ main(void) {
 			continue;
 		}
 
-		// 4. Track GPS status on the GPS lock LED
+		// 4. Handle serial sentence completions
+		if (nmea_ready) {
+			// We're doing this here to get the heavy processing
+			// out of an ISR. It *is* a lot of work, after all.
+			// But this may take a long time, so we need to let
+			// the serial ISR keep working.
+			unsigned char temp_buf[RX_BUF_LEN];
+			unsigned int temp_len = rx_str_len;
+			memcpy(temp_buf, (const char *)rx_buf, temp_len);
+			rx_str_len = 0; // clear the buffer
+			nmea_ready = 0;
+			handleGPS(temp_buf, temp_len);
+			continue;
+		}
+
+		// 5. Check the button for user interactions
+		unsigned char button = check_button();
+		if (button) {
+			PORTD.OUTTGL = AUPWR_bm; // toggle the audio on and off
+		}
+
+		// 6. Track GPS status on the GPS lock LED
 		if (gps_locked) {
 			LED_PORT.OUTCLR = GPS_ERR_bm;
 		} else {
 			LED_PORT.OUTSET = GPS_ERR_bm;
-			continue;
+			continue; // prevent everything that follows
 		}
 
-		// 5. End the tick or beep that was started by the PPS ISR
-		unsigned long ticks_in_second, ticklen;
-		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-			ticks_in_second = ticks() - second_start_tick;
-			ticklen = second_in_block == 0?BEEP_TICKS:TICK_TICKS;
-		}
-		if (ticks_in_second > ticklen && !tick_cleared) {
-			PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
-			tick_cleared = 1;
-		}
-
-		// 6. If this is a new second (set by PPS ISR), then kick off scheduled playback events
+		// 7. If this is a new second (set by PPS ISR), then kick off scheduled playback events
 		if (new_second) {
 
 			new_second = 0;
@@ -801,12 +807,6 @@ void __ATTR_NORETURN__ main(void) {
 					break;
 			}
 			continue;
-		}
-
-		// 7. Check the button for user interactions
-		unsigned char button = check_button();
-		if (button) {
-			PORTD.OUTTGL = AUPWR_bm; // toggle the audio on and off
 		}
 	}
 	__builtin_unreachable();
