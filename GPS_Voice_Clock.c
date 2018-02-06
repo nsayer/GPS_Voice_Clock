@@ -212,9 +212,9 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 	// Note that this also handles leap-seconds. We wind up pinning to 0
 	// twice. We can't do other than that because we'd need to know that
 	// the second after 59 is 60 instead of 0, and we can't know that.
-	if (s >= 60) { s = 0; m++; }
-	if (m >= 60) { m = 0; h++; }
-	if (h >= 24) { h = 0; }
+	while (s >= 60) { s -= 60; m++; }
+	while (m >= 60) { m -= 60; h++; }
+	while (h >= 24) { h -= 24; }
 
 	// Move to local standard time.
 /*
