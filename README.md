@@ -38,6 +38,9 @@ The files in the other three directories have names that are just numbers (no le
 0-23 for HOUR, 0-59 for MINUTE and 0, 10, 20, 30, 40, 50 for second. Each should last no longer than 1 second and should just be the
 number and units. As a special case, the 0 seconds file should simply say "Exactly."
 
+The top level directory can also have a file called CHIME that will play at the top of each hour (if it's present). If CHIME is present,
+there may also be a file called STROKE that (if present) is played once for every (AM/PM converted) hour.
+
 The audio files are little-endian 16 bit unsigned 8 kHz mono raw audio samples. You can create them from some other format with sox. The
 command line arguments for the output should be -t raw -c 1 -e unsigned -b 16 -r 8000.
 
