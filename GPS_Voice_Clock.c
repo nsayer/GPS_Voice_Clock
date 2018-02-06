@@ -525,36 +525,33 @@ static unsigned char check_button() {
 	__builtin_unreachable(); // we'll never get here.
 }
 
-void play_file(char *filename) {
+static unsigned char play_file_maybe(char *filename) {
 	unsigned int cnt;
 	// select the file
 	if (pf_open(filename)) {
-		LED_PORT.OUTSET = SD_ERR_bm;
-		return;
+		return -1;
 	}
 
 	// first, make sure the transfer complete flags are clear.
 	EDMA.INTFLAGS |= EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm;
 
 	if (pf_read((void*)(audio_buf[0]), sizeof(audio_buf[0]), &cnt)) {
-		LED_PORT.OUTSET = SD_ERR_bm;
-		return;
+		return -1;
 	}
-	if (!cnt) return; // empty file - we're done
+	if (!cnt) return 0; // empty file - we're done
 
 	EDMA.CH0.TRFCNT = cnt;
 	EDMA.CH0.CTRLA |= EDMA_CH_ENABLE_bm; // start
         if (cnt != sizeof(audio_buf[0])) {
 		// last read - just return.
-		return;
+		return 0;
 	}
 
 	// Set up the next block immediately
 	if (pf_read((void*)(audio_buf[1]), sizeof(audio_buf[1]), &cnt)) {
-		LED_PORT.OUTSET = SD_ERR_bm;
-		return;
+		return -1;
 	}
-	if (!cnt) return; // no actual data - so the first block was the end.
+	if (!cnt) return 0; // no actual data - so the first block was the end.
 	EDMA.CH2.TRFCNT = cnt;
 	EDMA.CH2.CTRLA |= EDMA_CH_REPEAT_bm; // take over from the first channel
 	if (cnt == sizeof(audio_buf[1])) {
@@ -562,6 +559,12 @@ void play_file(char *filename) {
 		// continue filling buffers as they become empty.
 		playing = 1;
 	}
+	return 0;
+}
+
+static void inline play_file(char *filename) {
+	if (!play_file_maybe(filename))
+		LED_PORT.OUTSET = SD_ERR_bm;
 }
 
 void read_switches(void) {
@@ -840,7 +843,10 @@ void __ATTR_NORETURN__ main(void) {
 						PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
 						PORTD.OUTSET = AUPWR_bm; // turn on the audio
 						chiming = 1;
-						play_file(P("CHIME"));
+						if (play_file_maybe(P("CHIME"))) {
+							chiming = 0; // no file - no chiming
+							PORTD.OUTCLR = AUPWR_bm;
+						}
 					}
 #endif
 					break;
