@@ -35,6 +35,10 @@
 #include "GPS_Voice_Clock.h"
 #include "pff.h"
 
+// Define this to play a chime file at the top of the hour
+// when the audio is otherwise turned off.
+#define CHIME
+
 // 32 MHz
 #define F_CPU (32000000UL)
 
@@ -91,6 +95,15 @@ volatile unsigned long second_start_tick;
 volatile unsigned char new_second;
 
 volatile unsigned char gps_locked;
+
+#ifdef CHIME
+volatile unsigned char chiming;
+unsigned char hour, minute, second;
+#else
+// We use this variable all over in if statements.
+// To avoid having to rewrite them all, just make it false.
+#define chiming (0)
+#endif
 
 unsigned char dst_mode;
 unsigned char tz;
@@ -245,6 +258,12 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 	snprintf(hour_filename, sizeof(hour_filename), P("/HOUR/%d"), h);
 	snprintf(minute_filename, sizeof(minute_filename), P("/MINUTE/%d"), m);
 	snprintf(second_filename, sizeof(second_filename), P("/SECOND/%d"), s);
+
+#ifdef CHIME
+	hour = h;
+	minute = m;
+	second = s;
+#endif
 
 	// Every hour, check to see if the leap second value in the receiver is out-of-date
 	if (m == 30 && s == 0) startLeapCheck();
@@ -416,7 +435,7 @@ ISR(PORTC_INT_vect) {
 
 	second_start_tick = ticks_cnt;
 	new_second = 1;
-	if (gps_locked) {
+	if (gps_locked && !chiming) {
 		PORTD.DIRSET = _BV(4); // turn on the tick
 	}
 }
@@ -680,6 +699,11 @@ void __ATTR_NORETURN__ main(void) {
         EDMA.CH2.DESTADDR = (unsigned int)&(DACA.CH0DATA);
         EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
 
+#ifdef CHIME
+	chiming = 0;
+	hour = minute = second = 99; // invalid
+#endif
+
 	ticks_cnt = 0;
 	utc_ref_year = 0;
 	gps_locked = 0;
@@ -718,7 +742,7 @@ void __ATTR_NORETURN__ main(void) {
 			ticks_in_second = ticks() - second_start_tick;
 			ticklen = second_in_block == 0?BEEP_TICKS:TICK_TICKS;
 		}
-		if (ticks_in_second > ticklen && !tick_cleared) {
+		if (ticks_in_second > ticklen && !tick_cleared && !chiming) {
 			PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
 			tick_cleared = 1;
 		}
@@ -730,7 +754,16 @@ void __ATTR_NORETURN__ main(void) {
 			unsigned char chan = (EDMA.INTFLAGS & EDMA_CH0TRNFIF_bm)?0:1;
                 	EDMA.INTFLAGS |= chan?EDMA_CH2TRNFIF_bm:EDMA_CH0TRNFIF_bm; // ack
 
-			if (!playing) continue; // This just means the last block finished.
+			if (!playing) {
+				// This just means the last block finished.
+#ifdef CHIME
+				if (chiming) {
+					chiming = 0; // We're done chiming now
+					PORTD.OUTCLR = AUPWR_bm; // Speaker back off
+				}
+#endif
+				continue;
+			}
 
 			unsigned int cnt;
 			if (pf_read((void*)(audio_buf[chan]), sizeof(audio_buf[chan]), &cnt)) {
@@ -772,7 +805,7 @@ void __ATTR_NORETURN__ main(void) {
 
 		// 5. Check the button for user interactions
 		unsigned char button = check_button();
-		if (button) {
+		if (button && !chiming) {
 			PORTD.OUTTGL = AUPWR_bm; // toggle the audio on and off
 		}
 
@@ -785,13 +818,23 @@ void __ATTR_NORETURN__ main(void) {
 		}
 
 		// 7. If this is a new second (set by PPS ISR), then kick off scheduled playback events
-		if (new_second) {
+		if (new_second && !chiming) {
 
 			new_second = 0;
 			tick_cleared = 0;
 			switch(second_in_block) {
 				case 0: // configuration changes are only allowed at second-start.
 					read_switches();
+#ifdef CHIME
+					// This is tricky. We are pre-announcing everything, so the chiming
+					// actually starts on the block that *would* announce 10 seconds - starting at 0 seconds.
+					if (second == 10 && minute == 0 && !(PORTD.OUT & AUPWR_bm)) {
+						PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
+						PORTD.OUTSET = AUPWR_bm; // turn on the audio
+						chiming = 1;
+						play_file(P("CHIME"));
+					}
+#endif
 					break;
 				case 2: // "At the tone..." intro for timezone
 					play_file(intro_filename);
