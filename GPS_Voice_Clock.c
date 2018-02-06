@@ -758,8 +758,16 @@ void __ATTR_NORETURN__ main(void) {
 				// This just means the last block finished.
 #ifdef CHIME
 				if (chiming) {
-					chiming = 0; // We're done chiming now
-					PORTD.OUTCLR = AUPWR_bm; // Speaker back off
+					// We finished either the chimes or a stroke. Time to play more strokes, perhaps?
+					unsigned char converted_hour = hour; // make an AM/PM hour
+					if (converted_hour > 12) converted_hour -= 12;
+					else if (converted_hour == 0) converted_hour = 12;
+					if (chiming++ < converted_hour + 1) {
+						play_file(P("STROKE"));
+					} else {
+						chiming = 0; // We're done chiming now
+						PORTD.OUTCLR = AUPWR_bm; // Speaker back off
+					}
 				}
 #endif
 				continue;
