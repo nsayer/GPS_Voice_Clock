@@ -766,7 +766,10 @@ void __ATTR_NORETURN__ main(void) {
 					if (converted_hour > 12) converted_hour -= 12;
 					else if (converted_hour == 0) converted_hour = 12;
 					if (chiming++ < converted_hour + 1) {
-						play_file(P("STROKE"));
+						if (play_file_maybe(P("STROKE"))) {
+							chiming = 0; // No stroke file - we're done.
+							PORTD.OUTCLR = AUPWR_bm; // Speaker back off
+						}
 					} else {
 						chiming = 0; // We're done chiming now
 						PORTD.OUTCLR = AUPWR_bm; // Speaker back off
