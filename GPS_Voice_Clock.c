@@ -842,11 +842,11 @@ void __ATTR_NORETURN__ main(void) {
 					if (second == 10 && minute == 0 && !(PORTD.OUT & AUPWR_bm)) {
 						PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
 						PORTD.OUTSET = AUPWR_bm; // turn on the audio
-						chiming = 1;
 						if (play_file_maybe(P("CHIME"))) {
-							chiming = 0; // no file - no chiming
-							PORTD.OUTCLR = AUPWR_bm;
+							PORTD.OUTCLR = AUPWR_bm; // abort - audio back off.
+							continue;
 						}
+						chiming = 1;
 					}
 #endif
 					break;
