@@ -41,7 +41,7 @@ The top level directory can also have a file called CHIME that will play at the 
 there may also be a file called STROKE that (if present) is played once for every (AM/PM converted) hour.
 
 The audio files are little-endian 16 bit unsigned 8 kHz mono raw audio samples. You can create them from some other format with sox. The
-command line arguments for the output should be -t raw -c 1 -e unsigned -b 16 -r 8000.
+command line arguments for the output should be -t raw -c 1 -e unsigned -b 16 -r 8000 -L.
 
 The SD_audio.zip file in this repository can be unpacked into the top directory of a suitably formatted card.
 
