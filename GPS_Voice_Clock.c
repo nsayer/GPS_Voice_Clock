@@ -35,10 +35,6 @@
 #include "GPS_Voice_Clock.h"
 #include "pff.h"
 
-// Define this to play a chime file at the top of the hour
-// when the audio is otherwise turned off.
-#define CHIME
-
 // 32 MHz
 #define F_CPU (32000000UL)
 
@@ -63,7 +59,9 @@
 // The possible values for dst_mode
 #define DST_OFF 0
 #define DST_US 1
-#define DST_MODE_MAX DST_US
+#define DST_EU 2
+#define DST_AU 3
+#define DST_NZ 4
 
 // We want something like 50 ms.
 #define DEBOUNCE_TICKS (50 * (F_TICK / 1000))
@@ -96,17 +94,15 @@ volatile unsigned char new_second;
 
 volatile unsigned char gps_locked;
 
-#ifdef CHIME
+char zone_char[8];
+char zone_hour[8];
+unsigned char zone_dst[8];
+
 volatile unsigned char chiming;
 unsigned char hour, minute, second;
-#else
-// We use this variable all over in if statements.
-// To avoid having to rewrite them all, just make it false.
-#define chiming (0)
-#endif
 
-unsigned char dst_mode;
 unsigned char tz;
+unsigned char chime_enabled;
 unsigned long debounce_time;
 unsigned char button_down;
 unsigned char second_in_block;
@@ -119,27 +115,6 @@ unsigned char playing;
 char intro_filename[16], hour_filename[16], minute_filename[16], second_filename[16];
 
 FATFS fatfs;
-
-// The possible values for tz
-#define TZ_UTC 0
-#define TZ_PAC 1
-#define TZ_MTN 2
-#define TZ_CEN 3
-#define TZ_EAS 4
-#define TZ_AK 5
-#define TZ_HI 6
-
-// The first letter of the intro filename is the zone.
-static const char zone_letters[] PROGMEM = "UPMCEAHU";
-
-static const char zone_hours[] PROGMEM = {0, -8, -7, -6, -5, -9, -10, 0};
-
-static inline char tz_letter() {
-	return pgm_read_byte(&(zone_letters[tz & 7]));
-}
-static inline char tz_hour() {
-	return pgm_read_byte(&(zone_hours[tz & 7]));
-}
 
 static const unsigned char month_tweak[] PROGMEM = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
 
@@ -189,10 +164,115 @@ static inline unsigned char calculateDSTUS(const unsigned char d, const unsigned
 			return 255;
 	}
 }
+static inline unsigned char calculateDSTEU(const unsigned char d, const unsigned char m, const unsigned int y) {
+        // DST is in effect between the last Sunday in March and the last Sunday in October
+        unsigned char change_day;
+        switch(m) {
+                case 1: // November through February
+                case 2:
+                case 11:
+                case 12:
+                        return DST_NO;
+                case 3: // March
+                        change_day = first_sunday(m, y);
+                        while(change_day + 7 <= 31) change_day += 7; // last Sunday
+                        if (d < change_day) return DST_NO;
+                        else if (d == change_day) return DST_BEGINS;
+                        else return DST_YES;
+                        break;
+                case 4: // April through September
+                case 5:
+                case 6:
+                case 7:
+                case 8:
+                case 9:
+                        return DST_YES;
+                case 10: // October
+                        change_day = first_sunday(m, y);
+                        while(change_day + 7 <= 31) change_day += 7; // last Sunday
+                        if (d < change_day) return DST_YES;
+                        else if (d == change_day) return DST_ENDS;
+                        else return DST_NO;
+                        break;
+                default: // This is impossible, since m can only be between 1 and 12.
+                        return 255;
+        }
+}
+static inline unsigned char calculateDSTAU(const unsigned char d, const unsigned char m, const unsigned int y) {
+        // DST is in effect between the first Sunday in October and the first Sunday in April
+        unsigned char change_day;
+        switch(m) {
+                case 1: // November through March
+                case 2:
+                case 3:
+                case 11:
+                case 12:
+                        return DST_YES;
+                case 4: // April
+                        change_day = first_sunday(m, y);
+                        if (d < change_day) return DST_YES;
+                        else if (d == change_day) return DST_ENDS;
+                        else return DST_NO;
+                        break;
+                case 5: // April through September
+                case 6:
+                case 7:
+                case 8:
+                case 9:
+                        return DST_NO;
+                case 10: // October
+                        change_day = first_sunday(m, y);
+                        if (d < change_day) return DST_NO;
+                        else if (d == change_day) return DST_BEGINS;
+                        else return DST_YES;
+                        break;
+                default: // This is impossible, since m can only be between 1 and 12.
+                        return 255;
+        }
+}
+static inline unsigned char calculateDSTNZ(const unsigned char d, const unsigned char m, const unsigned int y) {
+        // DST is in effect between the last Sunday in September and the first Sunday in April
+        unsigned char change_day;
+                switch(m) {
+                case 1: // October through March
+                case 2:
+                case 3:
+                case 10:
+                case 11:
+                case 12:
+                        return DST_YES;
+                case 4: // April
+                        change_day = first_sunday(m, y);
+                        if (d < change_day) return DST_YES;
+                        else if (d == change_day) return DST_ENDS;
+                        else return DST_NO;
+                        break;
+                case 5: // April through August
+                case 6:
+                case 7:
+                case 8:
+                        return DST_NO;
+                case 9: // September
+                        change_day = first_sunday(m, y);
+                        while(change_day + 7 <= 30) change_day += 7; // last Sunday
+                        if (d < change_day) return DST_NO;
+                        else if (d == change_day) return DST_BEGINS;
+                        else return DST_YES;
+                        break;
+                default: // This is impossible, since m can only be between 1 and 12.
+                        return 255;
+        }
+}
 static inline unsigned char calculateDST(const unsigned char d, const unsigned char m, const unsigned int y) {
-	switch(dst_mode) {
+	switch(zone_dst[tz]) {
 		case DST_US:
 			return calculateDSTUS(d, m, y);
+		case DST_EU:
+			return calculateDSTEU(d, m, y);
+		case DST_AU:
+			return calculateDSTAU(d, m, y);
+		case DST_NZ:
+			return calculateDSTNZ(d, m, y);
 		default: // off - should never happen
 			return DST_NO;
 	}
@@ -222,14 +302,14 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 	if (0) m += 30; // we'd need to make a UI for this somehow
 	while (m >= 60) h++, m -= 60;
 */
-	h += tz_hour();
+	h += zone_hour[tz];
 	while (h >= 24) h -= 24;
 	while (h < 0) h += 24;
 
 	unsigned char dst_offset = 0;
-	if (dst_mode != DST_OFF) {
+	if (zone_dst[tz] != DST_OFF) {
 		// For Europe, decisions are at 0100. Everywhere else it's 0200.
-		unsigned char decision_hour = 2;
+		unsigned char decision_hour = (zone_dst[tz] == DST_EU)?1:2;
 		switch(dst_flags) {
 			case DST_NO: dst_offset = 0; break; // do nothing
 			case DST_YES: dst_offset = 1; break; // add one hour
@@ -244,26 +324,24 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 				break;
 		}
 		h += dst_offset;
-		if (h >= 24) h -= 24;
+		while (h >= 24) h -= 24;
 	}
 
 	// It's ok to write these whenever you like. They will only really ever change
 	// during second zero of the block, which is reserved for the beep.
-	if (tz == TZ_UTC) {
-		// UTC has no DST.
-		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c"), tz_letter());
+	if (zone_dst[tz] == DST_OFF) {
+		// no DST, one char filename
+		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c"), zone_char[tz]);
 	} else {
-		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c%c"), tz_letter(), dst_offset?'D':'S');
+		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c%c"), zone_char[tz], dst_offset?'D':'S');
 	}
 	snprintf(hour_filename, sizeof(hour_filename), P("/HOUR/%d"), h);
 	snprintf(minute_filename, sizeof(minute_filename), P("/MINUTE/%d"), m);
 	snprintf(second_filename, sizeof(second_filename), P("/SECOND/%d"), s);
 
-#ifdef CHIME
 	hour = h;
 	minute = m;
 	second = s;
-#endif
 
 	// Every hour, check to see if the leap second value in the receiver is out-of-date
 	if (m == 30 && s == 0) startLeapCheck();
@@ -416,8 +494,8 @@ static inline void handleGPS(const unsigned char *rx_sentence, const unsigned in
 		// that will be good enough. Don't worry that this can result in d being either 0
 		// or past the last day of the month. Neither of those will match the "decision day"
 		// for DST, which is the only day on which the day of the month is significant.
-		if (h + tz_hour() < 0) d--;
-		if (h + tz_hour() > 23) d++;
+		if (h + zone_hour[tz] < 0) d--;
+		if (h + zone_hour[tz] > 23) d++;
 		unsigned char dst_flags = calculateDST(d, mon, y);
 		handle_time(h, min, s, dst_flags);
 	}
@@ -563,17 +641,15 @@ static unsigned char play_file_maybe(char *filename) {
 }
 
 static void inline play_file(char *filename) {
-	if (!play_file_maybe(filename))
+	if (play_file_maybe(filename))
 		LED_PORT.OUTSET = SD_ERR_bm;
 }
 
 void read_switches(void) {
 	// Switches are inverted. Flip them and shift them.
 	unsigned char cfg = (PORT_SW ^ DIPSW_gm) >> DIPSW_gp;
-	dst_mode = (cfg & 0x8)?DST_US:DST_OFF;
+	chime_enabled = (cfg & 0x80) != 0;
 	tz = cfg & 0x7;
-	if (tz == 7) tz = 0; // special case
-	if (tz == TZ_UTC) dst_mode = DST_OFF; // no DST for UTC.
 }
 
 // main() never returns.
@@ -702,10 +778,8 @@ void __ATTR_NORETURN__ main(void) {
         EDMA.CH2.DESTADDR = (unsigned int)&(DACA.CH0DATA);
         EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
 
-#ifdef CHIME
 	chiming = 0;
 	hour = minute = second = 99; // invalid
-#endif
 
 	ticks_cnt = 0;
 	utc_ref_year = 0;
@@ -730,9 +804,59 @@ void __ATTR_NORETURN__ main(void) {
 	startUTCReferenceFetch();
 
         if (pf_mount(&fatfs)) {
+		goto fail;
+	}
+
+	if (pf_open(P("CONFIG.TXT"))) {
+		goto fail;
+	}
+
+	{
+		char config_buf[512];
+		unsigned int cnt;
+		if (pf_read(config_buf, sizeof(config_buf), &cnt)) {
+			goto fail;
+		}
+		config_buf[cnt] = 0; // null terminate
+		// the config file consists of 8 lines, each describing a time zone configuration
+		// to be selected by switches 0-2.
+		char *cfg_ctx;
+		for(int i = 0; i < 7; i++) {
+			char *line = strtok_r((i == 0)?config_buf:NULL, P("\r\n"), &cfg_ctx);
+			// line format: "U,0,OFF" "P,-8,US" "K,12,NZ"
+			// first is the first letter for the zone filename.
+			// next is the base zone hour offset from UTC
+			// lastly is the name of the DST ruleset to use (N means none).
+			// if there is no DST ruleset, then there is no 2nd character in the zone filename
+			char *line_ctx;
+			char *tok = strtok_r(line, P(","), &line_ctx);
+			if (tok == NULL) goto fail;
+			zone_char[i] = *tok;
+			tok = strtok_r(NULL, P(","), &line_ctx);
+			if (tok == NULL) goto fail;
+			zone_hour[i] = (char)atoi(tok);
+			tok = strtok_r(NULL, P(","), &line_ctx);
+			if (tok == NULL) goto fail;
+			if (!strcasecmp_P(tok, PSTR("OFF"))) {
+				zone_dst[i] = DST_OFF;
+			} else if (!strcasecmp_P(tok, PSTR("US"))) {
+				zone_dst[i] = DST_US;
+			} else if (!strcasecmp_P(tok, PSTR("EU"))) {
+				zone_dst[i] = DST_EU;
+			} else if (!strcasecmp_P(tok, PSTR("AU"))) {
+				zone_dst[i] = DST_AU;
+			} else if (!strcasecmp_P(tok, PSTR("NZ"))) {
+				zone_dst[i] = DST_NZ;
+			} else goto fail;
+		}
+	}
+	goto done;
+
+	fail:
 		LED_PORT.OUTSET = SD_ERR_bm;
 		while(1) wdt_reset(); // Die hard
-	}
+
+	done:
 
 	while(1) {
 		// The big, main loop. Our tasks:
@@ -759,7 +883,6 @@ void __ATTR_NORETURN__ main(void) {
 
 			if (!playing) {
 				// This just means the last block finished.
-#ifdef CHIME
 				if (chiming) {
 					// We finished either the chimes or a stroke. Time to play more strokes, perhaps?
 					unsigned char converted_hour = hour; // make an AM/PM hour
@@ -775,7 +898,6 @@ void __ATTR_NORETURN__ main(void) {
 						PORTD.OUTCLR = AUPWR_bm; // Speaker back off
 					}
 				}
-#endif
 				continue;
 			}
 
@@ -839,7 +961,7 @@ void __ATTR_NORETURN__ main(void) {
 			switch(second_in_block) {
 				case 0: // configuration changes are only allowed at second-start.
 					read_switches();
-#ifdef CHIME
+					if (!chime_enabled) continue; // skip it
 					// This is tricky. We are pre-announcing everything, so the chiming
 					// actually starts on the block that *would* announce 10 seconds - starting at 0 seconds.
 					if (second == 10 && minute == 0 && !(PORTD.OUT & AUPWR_bm)) {
@@ -851,7 +973,6 @@ void __ATTR_NORETURN__ main(void) {
 						}
 						chiming = 1;
 					}
-#endif
 					break;
 				case 2: // "At the tone..." intro for timezone
 					play_file(intro_filename);
