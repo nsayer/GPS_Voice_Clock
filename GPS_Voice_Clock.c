@@ -648,8 +648,8 @@ static void inline play_file(char *filename) {
 void read_switches(void) {
 	// Switches are inverted. Flip them and shift them.
 	unsigned char cfg = (PORT_SW ^ DIPSW_gm) >> DIPSW_gp;
-	chime_enabled = (cfg & 0x80) != 0;
-	tz = cfg & 0x7;
+	chime_enabled = (cfg & _BV(3)) != 0;
+	tz = cfg & (_BV(0) | _BV(1) | _BV(2));
 }
 
 // main() never returns.
