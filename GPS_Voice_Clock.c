@@ -888,7 +888,7 @@ void __ATTR_NORETURN__ main(void) {
 					unsigned char converted_hour = hour; // make an AM/PM hour
 					if (converted_hour > 12) converted_hour -= 12;
 					else if (converted_hour == 0) converted_hour = 12;
-					if (minute != 0 || chiming++ < converted_hour + 1) {
+					if (minute == 0 && chiming++ < converted_hour + 1) {
 						if (play_file_maybe(P("STROKE"))) {
 							chiming = 0; // No stroke file - we're done.
 							PORTD.OUTCLR = AUPWR_bm; // Speaker back off
