@@ -885,17 +885,28 @@ void __ATTR_NORETURN__ main(void) {
 				// This just means the last block finished.
 				if (chiming) {
 					// We finished either the chimes or a stroke. Time to play more strokes, perhaps?
+					// chiming is equal to 1 before the first "stroke". But if it's not minute 0,
+					// we want to just end it here.
+					if (chiming == 1 && minute != 0) {
+						chiming = 0;
+						PORTD.OUTCLR = AUPWR_bm;
+						continue;
+					}
+					// The strokes are in AM/PM style hours, so make that up.
 					unsigned char converted_hour = hour; // make an AM/PM hour
 					if (converted_hour > 12) converted_hour -= 12;
 					else if (converted_hour == 0) converted_hour = 12;
-					if (minute == 0 && chiming++ < converted_hour + 1) {
+
+					if (chiming++ < converted_hour + 1) {
 						if (play_file_maybe(P("STROKE"))) {
 							chiming = 0; // No stroke file - we're done.
 							PORTD.OUTCLR = AUPWR_bm; // Speaker back off
+							continue;
 						}
 					} else {
 						chiming = 0; // We're done chiming now
 						PORTD.OUTCLR = AUPWR_bm; // Speaker back off
+						continue;
 					}
 				}
 				continue;
