@@ -888,7 +888,7 @@ void __ATTR_NORETURN__ main(void) {
 					unsigned char converted_hour = hour; // make an AM/PM hour
 					if (converted_hour > 12) converted_hour -= 12;
 					else if (converted_hour == 0) converted_hour = 12;
-					if (chiming++ < converted_hour + 1) {
+					if (minute != 0 || chiming++ < converted_hour + 1) {
 						if (play_file_maybe(P("STROKE"))) {
 							chiming = 0; // No stroke file - we're done.
 							PORTD.OUTCLR = AUPWR_bm; // Speaker back off
@@ -964,11 +964,13 @@ void __ATTR_NORETURN__ main(void) {
 					if (!chime_enabled) continue; // skip it
 					// This is tricky. We are pre-announcing everything, so the chiming
 					// actually starts on the block that *would* announce 10 seconds - starting at 0 seconds.
-					if (second == 10 && minute == 0 && !(PORTD.OUT & AUPWR_bm)) {
+					if (second == 10 && !(PORTD.OUT & AUPWR_bm)) {
+						char fname[10];
+						snprintf(fname, sizeof(fname), P("CHIME%d"), minute);
 						PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
 						PORTD.OUTSET = AUPWR_bm; // turn on the audio
-						if (play_file_maybe(P("CHIME"))) {
-							PORTD.OUTCLR = AUPWR_bm; // abort - audio back off.
+						if (play_file_maybe(fname)) {
+							PORTD.OUTCLR = AUPWR_bm; // abort - no file - audio back off.
 							continue;
 						}
 						chiming = 1;
