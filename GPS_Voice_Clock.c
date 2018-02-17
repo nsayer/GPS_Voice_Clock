@@ -606,14 +606,14 @@ static unsigned char check_button() {
 static unsigned char play_file_maybe(char *filename) {
 	unsigned int cnt;
 	// select the file
-	if (pf_open(filename)) {
+	if (pf_open(filename) != FR_OK) {
 		return -1;
 	}
 
 	// first, make sure the transfer complete flags are clear.
 	EDMA.INTFLAGS |= EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm;
 
-	if (pf_read((void*)(audio_buf[0]), sizeof(audio_buf[0]), &cnt)) {
+	if (pf_read((void*)(audio_buf[0]), sizeof(audio_buf[0]), &cnt) != FR_OK) {
 		return -1;
 	}
 	if (!cnt) return 0; // empty file - we're done
@@ -626,7 +626,7 @@ static unsigned char play_file_maybe(char *filename) {
 	}
 
 	// Set up the next block immediately
-	if (pf_read((void*)(audio_buf[1]), sizeof(audio_buf[1]), &cnt)) {
+	if (pf_read((void*)(audio_buf[1]), sizeof(audio_buf[1]), &cnt) != FR_OK) {
 		return -1;
 	}
 	if (!cnt) return 0; // no actual data - so the first block was the end.
@@ -803,18 +803,18 @@ void __ATTR_NORETURN__ main(void) {
 
 	startUTCReferenceFetch();
 
-        if (pf_mount(&fatfs)) {
+        if (pf_mount(&fatfs) != FR_OK) {
 		goto fail;
 	}
 
-	if (pf_open(P("CONFIG.TXT"))) {
+	if (pf_open(P("CONFIG.TXT")) != FR_OK) {
 		goto fail;
 	}
 
 	{
 		char config_buf[512];
 		unsigned int cnt;
-		if (pf_read(config_buf, sizeof(config_buf), &cnt)) {
+		if (pf_read(config_buf, sizeof(config_buf), &cnt) != FR_OK) {
 			goto fail;
 		}
 		config_buf[cnt] = 0; // null terminate
@@ -913,7 +913,7 @@ void __ATTR_NORETURN__ main(void) {
 			}
 
 			unsigned int cnt;
-			if (pf_read((void*)(audio_buf[chan]), sizeof(audio_buf[chan]), &cnt)) {
+			if (pf_read((void*)(audio_buf[chan]), sizeof(audio_buf[chan]), &cnt) != FR_OK) {
 				// abort
 				playing = 0;
 				LED_PORT.OUTSET = SD_ERR_bm;
@@ -975,15 +975,15 @@ void __ATTR_NORETURN__ main(void) {
 					if (!chime_enabled) continue; // skip it
 					// This is tricky. We are pre-announcing everything, so the chiming
 					// actually starts on the block that *would* announce 10 seconds - starting at 0 seconds.
-					if (second == 10 && !(PORTD.OUT & AUPWR_bm)) {
+					if (second == 10 && !(PORTD.OUT & AUPWR_bm)) { // if it's time, and if the audio is off...
 						char fname[10];
 						snprintf(fname, sizeof(fname), P("CHIME%d"), minute);
+						if (pf_open(fname) != FR_OK) {
+							continue; // file can't be opened, abort.
+						}
 						PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
 						PORTD.OUTSET = AUPWR_bm; // turn on the audio
-						if (play_file_maybe(fname)) {
-							PORTD.OUTCLR = AUPWR_bm; // abort - no file - audio back off.
-							continue;
-						}
+						play_file(fname); // we know it already exists
 						chiming = 1;
 					}
 					break;
