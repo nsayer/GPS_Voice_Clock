@@ -13,7 +13,7 @@ is essentially an MIT license.
 Build the code with the included Makefile, which assumes you have an avr-gcc with XMega support in your path. Upload
 it to the controller on the board with avrdude and a PDI capable programmer.
 
-DIP switch 4 selects whether to use daylight savings time or not. Switches 3 to 0 select the time zone. The available
+DIP switch 3 selects whether to perform chimes or not. Switches 3 to 0 select the time zone. The available
 time zone selections are governed by a configuration file (called CONFIG.TXT) in the top level of the SD card. The config
 file has 8 lines. Each line is a comma separated list of 3 fields. The first field is a single character representing the
 first letter of the name of the zone file pair in the ZONE directory. The second field is the offset from UTC for standard
