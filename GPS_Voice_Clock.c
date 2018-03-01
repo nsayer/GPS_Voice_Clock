@@ -327,24 +327,26 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 		while (h >= 24) h -= 24;
 	}
 
-	// It's ok to write these whenever you like. They will only really ever change
-	// during second zero of the block, which is reserved for the beep.
-	if (zone_dst[tz] == DST_OFF) {
-		// no DST, one char filename
-		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c"), zone_char[tz]);
-	} else {
-		snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c%c"), zone_char[tz], dst_offset?'D':'S');
-	}
-	snprintf(hour_filename, sizeof(hour_filename), P("/HOUR/%d"), h);
-	snprintf(minute_filename, sizeof(minute_filename), P("/MINUTE/%d"), m);
-	snprintf(second_filename, sizeof(second_filename), P("/SECOND/%d"), s);
-
 	hour = h;
 	minute = m;
 	second = s;
 
-	// Every hour, check to see if the leap second value in the receiver is out-of-date
-	if (m == 30 && s == 0) startLeapCheck();
+	if (second_in_block == 0) {
+		// These will only really ever change during second zero of
+		// the block, which is reserved for the beep.
+		if (zone_dst[tz] == DST_OFF) {
+			// no DST, one char filename
+			snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c"), zone_char[tz]);
+		} else {
+			snprintf(intro_filename, sizeof(intro_filename), P("/ZONE/%c%c"), zone_char[tz], dst_offset?'D':'S');
+		}
+		snprintf(hour_filename, sizeof(hour_filename), P("/HOUR/%d"), h);
+		snprintf(minute_filename, sizeof(minute_filename), P("/MINUTE/%d"), m);
+		snprintf(second_filename, sizeof(second_filename), P("/SECOND/%d"), s);
+
+		// Every hour, check to see if the leap second value in the receiver is out-of-date
+		if (m == 30 && s == 0) startLeapCheck();
+	}
 }
 
 static inline void tx_char(const unsigned char c);
@@ -888,6 +890,7 @@ void __ATTR_NORETURN__ main(void) {
 					// chiming is equal to 1 before the first "stroke". But if it's not minute 0,
 					// we want to just end it here.
 					if (chiming == 1 && minute != 0) {
+						// If it's not minute zero, stop now.
 						chiming = 0;
 						PORTD.OUTCLR = AUPWR_bm;
 						continue;
@@ -898,39 +901,37 @@ void __ATTR_NORETURN__ main(void) {
 					else if (converted_hour == 0) converted_hour = 12;
 
 					if (chiming++ < converted_hour + 1) {
-						if (play_file_maybe(P("STROKE"))) {
-							chiming = 0; // No stroke file - we're done.
-							PORTD.OUTCLR = AUPWR_bm; // Speaker back off
+						if (!play_file_maybe(P("STROKE"))) {
+							// skip everything that follows
 							continue;
 						}
-					} else {
-						chiming = 0; // We're done chiming now
-						PORTD.OUTCLR = AUPWR_bm; // Speaker back off
-						continue;
+						// else fall through
 					}
+					chiming = 0; // We're done chiming now
+					PORTD.OUTCLR = AUPWR_bm; // Speaker back off
 				}
-				continue;
-			}
-
-			unsigned int cnt;
-			if (pf_read((void*)(audio_buf[chan]), sizeof(audio_buf[chan]), &cnt) != FR_OK) {
-				// abort
-				playing = 0;
-				LED_PORT.OUTSET = SD_ERR_bm;
-				continue;
-			}
-			if (cnt == 0) {
-				// There was no data in the final read, so don't bother with it.
-				playing = 0;
-				continue;
-			}
-			(chan?&(EDMA.CH2):&(EDMA.CH0))->TRFCNT = cnt;
-			(chan?&(EDMA.CH2):&(EDMA.CH0))->CTRLA |= EDMA_CH_REPEAT_bm; // continue with this buffer
-			if (cnt != sizeof(audio_buf[chan])) {
-				// This is the last audio chunk, so we are done. Stop paying attention.
-				// DMA will stop after this buffer plays because the other one won't have had
-				// REPEAT turned on.
-				playing = 0;
+			} else {
+				// playing
+				unsigned int cnt;
+				if (pf_read((void*)(audio_buf[chan]), sizeof(audio_buf[chan]), &cnt) != FR_OK) {
+					// abort
+					playing = 0;
+					LED_PORT.OUTSET = SD_ERR_bm;
+					continue;
+				}
+				if (cnt == 0) {
+					// There was no data in the final read, so don't bother with it.
+					playing = 0;
+					continue;
+				}
+				(chan?&(EDMA.CH2):&(EDMA.CH0))->TRFCNT = cnt;
+				(chan?&(EDMA.CH2):&(EDMA.CH0))->CTRLA |= EDMA_CH_REPEAT_bm; // continue with this buffer
+				if (cnt != sizeof(audio_buf[chan])) {
+					// This is the last audio chunk, so we are done. Stop paying attention.
+					// DMA will stop after this buffer plays because the other one won't have had
+					// REPEAT turned on.
+					playing = 0;
+				}
 			}
 			continue;
 		}
@@ -944,8 +945,10 @@ void __ATTR_NORETURN__ main(void) {
 			unsigned char temp_buf[RX_BUF_LEN];
 			unsigned int temp_len = rx_str_len;
 			memcpy(temp_buf, (const char *)rx_buf, temp_len);
-			rx_str_len = 0; // clear the buffer
-			nmea_ready = 0;
+			ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+				rx_str_len = 0; // clear the buffer
+				nmea_ready = 0;
+			}
 			handleGPS(temp_buf, temp_len);
 			continue;
 		}
