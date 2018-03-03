@@ -13,7 +13,7 @@ is essentially an MIT license.
 Build the code with the included Makefile, which assumes you have an avr-gcc with XMega support in your path. Upload
 it to the controller on the board with avrdude and a PDI capable programmer.
 
-DIP switch 3 selects whether to perform chimes or not. Switches 3 to 0 select the time zone. The available
+DIP switch 3 selects whether to perform chimes or not. Switches 2 to 0 select the time zone. The available
 time zone selections are governed by a configuration file (called CONFIG.TXT) in the top level of the SD card. The config
 file has 8 lines. Each line is a comma separated list of 3 fields. The first field is a single character representing the
 first letter of the name of the zone file pair in the ZONE directory. The second field is the offset from UTC for standard
@@ -48,7 +48,7 @@ to chime, the chime will be skipped.
 The audio files are little-endian 16 bit unsigned 8 kHz mono raw audio samples. You can create them from some other format with sox. The
 command line arguments for the output should be -t raw -c 1 -e unsigned -b 16 -r 8000 -L.
 
-The SD_audio.zip file in this repository can be unpacked into the top directory of a suitably formatted card.
+The SD_audio.zip file in this repository can be unpacked into the top directory of a suitably formatted card. If chimes are desired, then one of the chime zip files can be unzipped to the same place.
 
 The card cannot be hot-swapped. Remove the card only when the board is off. The current firmware cannot recover from SD mounting errors
 without being power-cycled.
