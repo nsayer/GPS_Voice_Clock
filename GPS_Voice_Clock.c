@@ -981,27 +981,28 @@ void __ATTR_NORETURN__ main(void) {
 		if (new_second && !chiming) {
 			new_second = 0;
 			tick_cleared = 0;
+			// This used to be in the case statement below, but it needs to happen for both WWV and !WWV.
+			if (second_in_block == 0) {
+				read_switches();
+				if (!chime_enabled) continue; // skip it
+				// This is tricky. We are pre-announcing everything, so the chiming
+				// actually starts on the block that *would* announce 10 seconds - starting at 0 seconds.
+				if (second == 10 && !(PORTD.OUT & AUPWR_bm)) { // if it's time, and if the audio is off...
+					char fname[10];
+					snprintf(fname, sizeof(fname), P("CHIME%d"), minute);
+					if (pf_open(fname) != FR_OK) {
+						continue; // file can't be opened, abort.
+					}
+					PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
+					PORTD.OUTSET = AUPWR_bm; // turn on the audio
+					play_file(fname); // we know it already exists
+					chiming = 1;
+				}
+			}
 #ifdef WWV
-			if (second == 0 || (second == 10 && (!PORTD.OUT & AUPWR_bm)))
+			if (second == 0)
 #endif
 			switch(second_in_block) {
-				case 0: // configuration changes are only allowed at second-start.
-					read_switches();
-					if (!chime_enabled) continue; // skip it
-					// This is tricky. We are pre-announcing everything, so the chiming
-					// actually starts on the block that *would* announce 10 seconds - starting at 0 seconds.
-					if (second == 10 && !(PORTD.OUT & AUPWR_bm)) { // if it's time, and if the audio is off...
-						char fname[10];
-						snprintf(fname, sizeof(fname), P("CHIME%d"), minute);
-						if (pf_open(fname) != FR_OK) {
-							continue; // file can't be opened, abort.
-						}
-						PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
-						PORTD.OUTSET = AUPWR_bm; // turn on the audio
-						play_file(fname); // we know it already exists
-						chiming = 1;
-					}
-					break;
 				case 2: // "At the tone..." intro for timezone
 					play_file(intro_filename);
 					break;
