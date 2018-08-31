@@ -982,7 +982,7 @@ void __ATTR_NORETURN__ main(void) {
 			new_second = 0;
 			tick_cleared = 0;
 #ifdef WWV
-			if (second == 0)
+			if (second == 0 || (second == 10 && (!PORTD.OUT & AUPWR_bm)))
 #endif
 			switch(second_in_block) {
 				case 0: // configuration changes are only allowed at second-start.
