@@ -35,6 +35,10 @@
 #include "GPS_Voice_Clock.h"
 #include "pff.h"
 
+// WWV mode has plain ticks for 59 seconds and a long beep at zero.
+// Also, only a single time announcement at 50 seconds.
+//#define WWV
+
 // 32 MHz
 #define F_CPU (32000000UL)
 
@@ -869,7 +873,13 @@ void __ATTR_NORETURN__ main(void) {
 		unsigned long ticks_in_second, ticklen;
 		ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 			ticks_in_second = ticks() - second_start_tick;
+#ifdef WWV
+			// This looks odd, but the 0th second belongs to the time announcement
+			// for the 10th second.
+			ticklen = (second == 10 && second_in_block == 0)?BEEP_TICKS:TICK_TICKS;
+#else
 			ticklen = second_in_block == 0?BEEP_TICKS:TICK_TICKS;
+#endif
 		}
 		if (ticks_in_second > ticklen && !tick_cleared && !chiming) {
 			PORTD.DIRCLR = _BV(4); // turn off the ticking/beeping
@@ -969,9 +979,11 @@ void __ATTR_NORETURN__ main(void) {
 
 		// 7. If this is a new second (set by PPS ISR), then kick off scheduled playback events
 		if (new_second && !chiming) {
-
 			new_second = 0;
 			tick_cleared = 0;
+#ifdef WWV
+			if (second == 0)
+#endif
 			switch(second_in_block) {
 				case 0: // configuration changes are only allowed at second-start.
 					read_switches();
@@ -999,9 +1011,11 @@ void __ATTR_NORETURN__ main(void) {
 				case 7: // "57 minutes"
 					play_file(minute_filename);
 					break;
+#ifndef WWV
 				case 8: // "Exactly."
 					play_file(second_filename);
 					break;
+#endif
 			}
 			continue;
 		}
