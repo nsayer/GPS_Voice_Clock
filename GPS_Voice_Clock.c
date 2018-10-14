@@ -39,6 +39,14 @@
 // Also, only a single time announcement at 50 seconds.
 //#define WWV
 
+// AMPM mode changes the announcement to use AM/PM hours. It requires
+// "AM" and "PM" sample files.
+//#define AMPM
+
+#if (defined(AMPM) && !defined(WWV))
+#error "AMPM is currently only supported for WWV mode"
+#endif
+
 // 32 MHz
 #define F_CPU (32000000UL)
 
@@ -104,6 +112,9 @@ unsigned char zone_dst[8];
 
 volatile unsigned char chiming;
 unsigned char hour, minute, second;
+#ifdef AMPM
+unsigned char is_pm;
+#endif
 
 unsigned char tz;
 unsigned char chime_enabled;
@@ -117,6 +128,9 @@ unsigned char utc_ref_day;
 unsigned char playing;
 
 char intro_filename[16], hour_filename[16], minute_filename[16], second_filename[16];
+#ifdef AMPM
+char meridian_filename[16];
+#endif
 
 FATFS fatfs;
 
@@ -331,10 +345,21 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 		while (h >= 24) h -= 24;
 	}
 
+#ifdef AMPM
+	is_pm = 0;
+	if (h == 0) h = 12;
+	else if (h == 12) is_pm = 1;
+	else if (h > 12) {
+		h -= 12;
+		is_pm = 1;
+	}
+#endif
+
 	hour = h;
 	minute = m;
 	second = s;
 
+	
 	if (second_in_block == 0) {
 		// These will only really ever change during second zero of
 		// the block, which is reserved for the beep.
@@ -347,6 +372,9 @@ static inline void handle_time(char h, unsigned char m, unsigned char s, unsigne
 		snprintf(hour_filename, sizeof(hour_filename), P("/HOUR/%d"), h);
 		snprintf(minute_filename, sizeof(minute_filename), P("/MINUTE/%d"), m);
 		snprintf(second_filename, sizeof(second_filename), P("/SECOND/%d"), s);
+#ifdef AMPM
+		snprintf(meridian_filename, sizeof(meridian_filename), P("/%cM"), is_pm?'P':'A');
+#endif
 
 		// Every hour, check to see if the leap second value in the receiver is out-of-date
 		if (m == 30 && s == 0) startLeapCheck();
@@ -1012,7 +1040,13 @@ void __ATTR_NORETURN__ main(void) {
 				case 7: // "57 minutes"
 					play_file(minute_filename);
 					break;
-#ifndef WWV
+#ifdef WWV
+#ifdef AMPM
+				case 8: // "PM"
+					play_file(meridian_filename);
+					break;
+#endif
+#else
 				case 8: // "Exactly."
 					play_file(second_filename);
 					break;
