@@ -638,17 +638,17 @@ static unsigned char check_button() {
 }
 
 static unsigned char play_file_maybe(char *filename) {
-        // Force an abort by turning off enable and repeat.
-        EDMA.CH0.CTRLA &= ~(EDMA_CH_ENABLE_bm | EDMA_CH_REPEAT_bm);
-        EDMA.CH2.CTRLA &= ~(EDMA_CH_ENABLE_bm | EDMA_CH_REPEAT_bm);
-        // select the file. Do this now so the abort has time to take, if necessary.
-        if (pf_open(filename) != FR_OK) {
-                return -1;
-        }
-        while(EDMA.STATUS & (EDMA_CH0BUSY_bm | EDMA_CH2BUSY_bm)) ; // wait for abort - should be nothing
-        // If we aborted, then the start address will be wrong and must be reset.
-        EDMA.CH0.ADDR = (unsigned int)&(audio_buf[0]);
-        EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
+	// Force an abort by turning off enable and repeat.
+	EDMA.CH0.CTRLA &= ~(EDMA_CH_ENABLE_bm | EDMA_CH_REPEAT_bm);
+	EDMA.CH2.CTRLA &= ~(EDMA_CH_ENABLE_bm | EDMA_CH_REPEAT_bm);
+	// select the file. Do this now so the abort has time to take, if necessary.
+	if (pf_open(filename) != FR_OK) {
+		return -1;
+	}
+	while(EDMA.STATUS & (EDMA_CH0BUSY_bm | EDMA_CH2BUSY_bm)) ; // wait for abort - should be nothing
+	// If we aborted, then the start address will be wrong and must be reset.
+	EDMA.CH0.ADDR = (unsigned int)&(audio_buf[0]);
+	EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
 
 	// first, make sure the transfer complete flags are clear.
 	EDMA.INTFLAGS |= EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm;
