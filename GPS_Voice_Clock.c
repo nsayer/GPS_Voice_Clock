@@ -183,103 +183,103 @@ static inline unsigned char calculateDSTUS(const unsigned char d, const unsigned
 	}
 }
 static inline unsigned char calculateDSTEU(const unsigned char d, const unsigned char m, const unsigned int y) {
-        // DST is in effect between the last Sunday in March and the last Sunday in October
-        unsigned char change_day;
-        switch(m) {
-                case 1: // November through February
-                case 2:
-                case 11:
-                case 12:
-                        return DST_NO;
-                case 3: // March
-                        change_day = first_sunday(m, y);
-                        while(change_day + 7 <= 31) change_day += 7; // last Sunday
-                        if (d < change_day) return DST_NO;
-                        else if (d == change_day) return DST_BEGINS;
-                        else return DST_YES;
-                        break;
-                case 4: // April through September
-                case 5:
-                case 6:
-                case 7:
-                case 8:
-                case 9:
-                        return DST_YES;
-                case 10: // October
-                        change_day = first_sunday(m, y);
-                        while(change_day + 7 <= 31) change_day += 7; // last Sunday
-                        if (d < change_day) return DST_YES;
-                        else if (d == change_day) return DST_ENDS;
-                        else return DST_NO;
-                        break;
-                default: // This is impossible, since m can only be between 1 and 12.
-                        return 255;
-        }
+	// DST is in effect between the last Sunday in March and the last Sunday in October
+	unsigned char change_day;
+	switch(m) {
+		case 1: // November through February
+		case 2:
+		case 11:
+		case 12:
+			return DST_NO;
+		case 3: // March
+			change_day = first_sunday(m, y);
+			while(change_day + 7 <= 31) change_day += 7; // last Sunday
+			if (d < change_day) return DST_NO;
+			else if (d == change_day) return DST_BEGINS;
+			else return DST_YES;
+			break;
+		case 4: // April through September
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+			return DST_YES;
+		case 10: // October
+			change_day = first_sunday(m, y);
+			while(change_day + 7 <= 31) change_day += 7; // last Sunday
+			if (d < change_day) return DST_YES;
+			else if (d == change_day) return DST_ENDS;
+			else return DST_NO;
+			break;
+		default: // This is impossible, since m can only be between 1 and 12.
+			return 255;
+	}
 }
 static inline unsigned char calculateDSTAU(const unsigned char d, const unsigned char m, const unsigned int y) {
-        // DST is in effect between the first Sunday in October and the first Sunday in April
-        unsigned char change_day;
-        switch(m) {
-                case 1: // November through March
-                case 2:
-                case 3:
-                case 11:
-                case 12:
-                        return DST_YES;
-                case 4: // April
-                        change_day = first_sunday(m, y);
-                        if (d < change_day) return DST_YES;
-                        else if (d == change_day) return DST_ENDS;
-                        else return DST_NO;
-                        break;
-                case 5: // April through September
-                case 6:
-                case 7:
-                case 8:
-                case 9:
-                        return DST_NO;
-                case 10: // October
-                        change_day = first_sunday(m, y);
-                        if (d < change_day) return DST_NO;
-                        else if (d == change_day) return DST_BEGINS;
-                        else return DST_YES;
-                        break;
-                default: // This is impossible, since m can only be between 1 and 12.
-                        return 255;
-        }
+	// DST is in effect between the first Sunday in October and the first Sunday in April
+	unsigned char change_day;
+	switch(m) {
+		case 1: // November through March
+		case 2:
+		case 3:
+		case 11:
+		case 12:
+			return DST_YES;
+		case 4: // April
+			change_day = first_sunday(m, y);
+			if (d < change_day) return DST_YES;
+			else if (d == change_day) return DST_ENDS;
+			else return DST_NO;
+			break;
+		case 5: // April through September
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+			return DST_NO;
+		case 10: // October
+			change_day = first_sunday(m, y);
+			if (d < change_day) return DST_NO;
+			else if (d == change_day) return DST_BEGINS;
+			else return DST_YES;
+			break;
+		default: // This is impossible, since m can only be between 1 and 12.
+			return 255;
+	}
 }
 static inline unsigned char calculateDSTNZ(const unsigned char d, const unsigned char m, const unsigned int y) {
-        // DST is in effect between the last Sunday in September and the first Sunday in April
-        unsigned char change_day;
-                switch(m) {
-                case 1: // October through March
-                case 2:
-                case 3:
-                case 10:
-                case 11:
-                case 12:
-                        return DST_YES;
-                case 4: // April
-                        change_day = first_sunday(m, y);
-                        if (d < change_day) return DST_YES;
-                        else if (d == change_day) return DST_ENDS;
-                        else return DST_NO;
-                        break;
-                case 5: // April through August
-                case 6:
-                case 7:
-                case 8:
-                        return DST_NO;
-                case 9: // September
-                        change_day = first_sunday(m, y);
-                        while(change_day + 7 <= 30) change_day += 7; // last Sunday
-                        if (d < change_day) return DST_NO;
-                        else if (d == change_day) return DST_BEGINS;
-                        else return DST_YES;
-                        break;
-                default: // This is impossible, since m can only be between 1 and 12.
-                        return 255;
-        }
+	// DST is in effect between the last Sunday in September and the first Sunday in April
+	unsigned char change_day;
+		switch(m) {
+		case 1: // October through March
+		case 2:
+		case 3:
+		case 10:
+		case 11:
+		case 12:
+			return DST_YES;
+		case 4: // April
+			change_day = first_sunday(m, y);
+			if (d < change_day) return DST_YES;
+			else if (d == change_day) return DST_ENDS;
+			else return DST_NO;
+			break;
+		case 5: // April through August
+		case 6:
+		case 7:
+		case 8:
+			return DST_NO;
+		case 9: // September
+			change_day = first_sunday(m, y);
+			while(change_day + 7 <= 30) change_day += 7; // last Sunday
+			if (d < change_day) return DST_NO;
+			else if (d == change_day) return DST_BEGINS;
+			else return DST_YES;
+			break;
+		default: // This is impossible, since m can only be between 1 and 12.
+			return 255;
+	}
 }
 static inline unsigned char calculateDST(const unsigned char d, const unsigned char m, const unsigned int y) {
 	switch(zone_dst[tz]) {
@@ -637,7 +637,50 @@ static unsigned char check_button() {
 	__builtin_unreachable(); // we'll never get here.
 }
 
-static unsigned char play_file_maybe(char *filename) {
+static void sd_fail() {
+	LED_PORT.OUTSET = SD_ERR_bm;
+	while(1) wdt_reset(); // Die hard
+}
+	
+static size_t read_audio(void* buf, size_t len) {
+	unsigned int cnt;
+	if (pf_read(buf, len / 2, &cnt) != FR_OK) {
+		// indicate an error
+		sd_fail();
+	}
+	for(int i = cnt - 1; i >= 0; i--) {
+		unsigned int sample = ((unsigned char *)buf)[i];
+		// mu-law decompression and signed to unsigned conversion.
+		if (sample == 0xff) sample = 0x8000;
+		else if (sample == 0x7f) sample = 0x7fff;
+		else {  
+			unsigned char interval = (sample & 0xf);
+			switch(sample >> 4) {
+			case 0: sample = 127 + (interval << 10); break;
+			case 1: sample = 16511 + (interval << 9); break;
+			case 2: sample = 24703 + (interval << 8); break;
+			case 3: sample = 28799 + (interval << 7); break;
+			case 4: sample = 30847 + (interval << 6); break;
+			case 5: sample = 31871 + (interval << 5); break;
+			case 6: sample = 32383 + (interval << 4); break;
+			case 7: sample = 32639 + (interval << 3); break;
+			case 8: sample = 49025 + ((15 - interval) << 10); break;
+			case 9: sample = 40833 + ((15 - interval) << 9); break;
+			case 0xa: sample = 36737 + ((15 - interval) << 8); break;
+			case 0xb: sample = 34689 + ((15 - interval) << 7); break;
+			case 0xc: sample = 33665 + ((15 - interval) << 6); break;
+			case 0xd: sample = 33153 + ((15 - interval) << 5); break;
+			case 0xe: sample = 32897 + ((15 - interval) << 4); break;
+			case 0xf: sample = 32769 + ((15 - interval) << 3); break;
+			}
+		}
+		((unsigned char*)buf)[i * 2] = (unsigned char)(sample >> 0); 
+		((unsigned char*)buf)[i * 2 + 1] = (unsigned char)(sample >> 8);
+	}
+	return cnt * 2;
+}
+
+static unsigned char play_file(char *filename) {
 	// Force an abort by turning off enable and repeat.
 	EDMA.CH0.CTRLA &= ~(EDMA_CH_ENABLE_bm | EDMA_CH_REPEAT_bm);
 	EDMA.CH2.CTRLA &= ~(EDMA_CH_ENABLE_bm | EDMA_CH_REPEAT_bm);
@@ -653,23 +696,18 @@ static unsigned char play_file_maybe(char *filename) {
 	// first, make sure the transfer complete flags are clear.
 	EDMA.INTFLAGS |= EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm;
 
-	unsigned int cnt;
-	if (pf_read((void*)(audio_buf[0]), sizeof(audio_buf[0]), &cnt) != FR_OK) {
-		return -1;
-	}
+	unsigned int cnt = read_audio((void*)(audio_buf[0]), sizeof(audio_buf[0]));
 	if (!cnt) return 0; // empty file - we're done
 
 	EDMA.CH0.TRFCNT = cnt;
 	EDMA.CH0.CTRLA |= EDMA_CH_ENABLE_bm; // start
-        if (cnt != sizeof(audio_buf[0])) {
+	if (cnt != sizeof(audio_buf[0])) {
 		// last read - just return.
 		return 0;
 	}
 
 	// Set up the next block immediately
-	if (pf_read((void*)(audio_buf[1]), sizeof(audio_buf[1]), &cnt) != FR_OK) {
-		return -1;
-	}
+	cnt = read_audio((void*)(audio_buf[1]), sizeof(audio_buf[1]));
 	if (!cnt) return 0; // no actual data - so the first block was the end.
 	EDMA.CH2.TRFCNT = cnt;
 	EDMA.CH2.CTRLA |= EDMA_CH_REPEAT_bm; // take over from the first channel
@@ -679,11 +717,6 @@ static unsigned char play_file_maybe(char *filename) {
 		playing = 1;
 	}
 	return 0;
-}
-
-static void inline play_file(char *filename) {
-	if (play_file_maybe(filename))
-		LED_PORT.OUTSET = SD_ERR_bm;
 }
 
 void read_switches(void) {
@@ -775,7 +808,7 @@ void __ATTR_NORETURN__ main(void) {
 	TCD5.CTRLC = 0;
 	TCD5.CTRLD = 0;
 	TCD5.CTRLE = TC45_CCAMODE_COMP_gc;
-        TCD5.INTCTRLA = TC45_OVFINTLVL_HI_gc;
+	TCD5.INTCTRLA = TC45_OVFINTLVL_HI_gc;
 	TCD5.INTCTRLB = 0;
 	TCD5.CCA = 249; // toggle at 2 kHz -> output 1 kHz
 
@@ -783,41 +816,41 @@ void __ATTR_NORETURN__ main(void) {
 	EVSYS.CH0MUX = EVSYS_CHMUX_TCC4_OVF_gc;
 	EVSYS.CH0CTRL = 0;
 
-        DACA.CTRLA = DAC_CH0EN_bm | DAC_ENABLE_bm;
-        DACA.CTRLB = DAC_CHSEL_SINGLE_gc | DAC_CH0TRIG_bm; // Trigger a conversion on event 0 - from the 8 kHz timer
-        DACA.CTRLC = DAC_REFSEL_AVCC_gc | DAC_LEFTADJ_bm; // lop off the low 4 bits of each sample
-        DACA.EVCTRL = DAC_EVSEL_0_gc; // trigger event 0
+	DACA.CTRLA = DAC_CH0EN_bm | DAC_ENABLE_bm;
+	DACA.CTRLB = DAC_CHSEL_SINGLE_gc | DAC_CH0TRIG_bm; // Trigger a conversion on event 0 - from the 8 kHz timer
+	DACA.CTRLC = DAC_REFSEL_AVCC_gc | DAC_LEFTADJ_bm; // lop off the low 4 bits of each sample
+	DACA.EVCTRL = DAC_EVSEL_0_gc; // trigger event 0
 
-        // Load factory calibration into the DAC
-        NVM.CMD = NVM_CMD_READ_CALIB_ROW_gc;
-        DACA.CH0GAINCAL = pgm_read_byte(offsetof(NVM_PROD_SIGNATURES_t, DACA0GAINCAL));
-        DACA.CH0OFFSETCAL = pgm_read_byte(offsetof(NVM_PROD_SIGNATURES_t, DACA0OFFCAL));
-        DACA.CH1GAINCAL = pgm_read_byte(offsetof(NVM_PROD_SIGNATURES_t, DACA1GAINCAL));
-        DACA.CH1OFFSETCAL = pgm_read_byte(offsetof(NVM_PROD_SIGNATURES_t, DACA1OFFCAL));
-        NVM.CMD = NVM_CMD_NO_OPERATION_gc;
+	// Load factory calibration into the DAC
+	NVM.CMD = NVM_CMD_READ_CALIB_ROW_gc;
+	DACA.CH0GAINCAL = pgm_read_byte(offsetof(NVM_PROD_SIGNATURES_t, DACA0GAINCAL));
+	DACA.CH0OFFSETCAL = pgm_read_byte(offsetof(NVM_PROD_SIGNATURES_t, DACA0OFFCAL));
+	DACA.CH1GAINCAL = pgm_read_byte(offsetof(NVM_PROD_SIGNATURES_t, DACA1GAINCAL));
+	DACA.CH1OFFSETCAL = pgm_read_byte(offsetof(NVM_PROD_SIGNATURES_t, DACA1OFFCAL));
+	NVM.CMD = NVM_CMD_NO_OPERATION_gc;
 
-        EDMA.CTRL = EDMA_RESET_bm;
-        while(EDMA.CTRL & EDMA_RESET_bm); // wait for it
+	EDMA.CTRL = EDMA_RESET_bm;
+	while(EDMA.CTRL & EDMA_RESET_bm); // wait for it
 
-        // DMA is two double-buffered, standard channels.
-        EDMA.CTRL = EDMA_ENABLE_bm | EDMA_CHMODE_STD02_gc | EDMA_DBUFMODE_BUF0123_gc | EDMA_PRIMODE_RR0123_gc;
+	// DMA is two double-buffered, standard channels.
+	EDMA.CTRL = EDMA_ENABLE_bm | EDMA_CHMODE_STD02_gc | EDMA_DBUFMODE_BUF0123_gc | EDMA_PRIMODE_RR0123_gc;
 
-        EDMA.CH0.CTRLA = EDMA_CH_SINGLE_bm | EDMA_CH_BURSTLEN_bm; // single-shot, two byte burst
-        EDMA.CH0.CTRLB = 0; // no interrupts
-        EDMA.CH0.ADDRCTRL = EDMA_CH_RELOAD_TRANSACTION_gc | EDMA_CH_DIR_INC_gc;
-        EDMA.CH0.DESTADDRCTRL = EDMA_CH_RELOAD_BURST_gc | EDMA_CH_DIR_INC_gc;
-        EDMA.CH0.TRIGSRC = EDMA_CH_TRIGSRC_DACA_CH0_gc;
-        EDMA.CH0.DESTADDR = (unsigned int)&(DACA.CH0DATA);
-        EDMA.CH0.ADDR = (unsigned int)&(audio_buf[0]);
+	EDMA.CH0.CTRLA = EDMA_CH_SINGLE_bm | EDMA_CH_BURSTLEN_bm; // single-shot, two byte burst
+	EDMA.CH0.CTRLB = 0; // no interrupts
+	EDMA.CH0.ADDRCTRL = EDMA_CH_RELOAD_TRANSACTION_gc | EDMA_CH_DIR_INC_gc;
+	EDMA.CH0.DESTADDRCTRL = EDMA_CH_RELOAD_BURST_gc | EDMA_CH_DIR_INC_gc;
+	EDMA.CH0.TRIGSRC = EDMA_CH_TRIGSRC_DACA_CH0_gc;
+	EDMA.CH0.DESTADDR = (unsigned int)&(DACA.CH0DATA);
+	EDMA.CH0.ADDR = (unsigned int)&(audio_buf[0]);
 
-        // Channel 2 is configured exactly the same way as channel 0, but with the 2nd memory buffer.
-        EDMA.CH2.CTRLA = EDMA_CH_SINGLE_bm | EDMA_CH_BURSTLEN_bm; // single-shot, two byte burst
-        EDMA.CH2.CTRLB = 0;
-        EDMA.CH2.ADDRCTRL = EDMA_CH_RELOAD_TRANSACTION_gc | EDMA_CH_DIR_INC_gc;
-        EDMA.CH2.DESTADDRCTRL = EDMA_CH_RELOAD_BURST_gc| EDMA_CH_DIR_INC_gc;
-        EDMA.CH2.TRIGSRC = EDMA_CH_TRIGSRC_DACA_CH0_gc;
-        EDMA.CH2.DESTADDR = (unsigned int)&(DACA.CH0DATA);
-        EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
+	// Channel 2 is configured exactly the same way as channel 0, but with the 2nd memory buffer.
+	EDMA.CH2.CTRLA = EDMA_CH_SINGLE_bm | EDMA_CH_BURSTLEN_bm; // single-shot, two byte burst
+	EDMA.CH2.CTRLB = 0;
+	EDMA.CH2.ADDRCTRL = EDMA_CH_RELOAD_TRANSACTION_gc | EDMA_CH_DIR_INC_gc;
+	EDMA.CH2.DESTADDRCTRL = EDMA_CH_RELOAD_BURST_gc| EDMA_CH_DIR_INC_gc;
+	EDMA.CH2.TRIGSRC = EDMA_CH_TRIGSRC_DACA_CH0_gc;
+	EDMA.CH2.DESTADDR = (unsigned int)&(DACA.CH0DATA);
+	EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
 
 	chiming = 0;
 	hour = minute = second = 99; // invalid
@@ -837,26 +870,26 @@ void __ATTR_NORETURN__ main(void) {
 	*minute_filename = 0;
 	*second_filename = 0;
 
-        PMIC.CTRL = PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm | PMIC_HILVLEN_bm;
-        sei();
+	PMIC.CTRL = PMIC_LOLVLEN_bm | PMIC_MEDLVLEN_bm | PMIC_HILVLEN_bm;
+	sei();
 
 	read_switches();
 
 	startUTCReferenceFetch();
 
-        if (pf_mount(&fatfs) != FR_OK) {
-		goto fail;
+	if (pf_mount(&fatfs) != FR_OK) {
+		sd_fail();
 	}
 
 	if (pf_open(P("CONFIG.TXT")) != FR_OK) {
-		goto fail;
+		sd_fail();
 	}
 
 	{
 		char config_buf[512];
 		unsigned int cnt;
 		if (pf_read(config_buf, sizeof(config_buf), &cnt) != FR_OK) {
-			goto fail;
+			sd_fail();
 		}
 		config_buf[cnt] = 0; // null terminate
 		// the config file consists of 8 lines, each describing a time zone configuration
@@ -871,13 +904,13 @@ void __ATTR_NORETURN__ main(void) {
 			// if there is no DST ruleset, then there is no 2nd character in the zone filename
 			char *line_ctx;
 			char *tok = strtok_r(line, P(","), &line_ctx);
-			if (tok == NULL) goto fail;
+			if (tok == NULL) sd_fail();
 			zone_char[i] = *tok;
 			tok = strtok_r(NULL, P(","), &line_ctx);
-			if (tok == NULL) goto fail;
+			if (tok == NULL) sd_fail();
 			zone_hour[i] = (char)atoi(tok);
 			tok = strtok_r(NULL, P(","), &line_ctx);
-			if (tok == NULL) goto fail;
+			if (tok == NULL) sd_fail();
 			if (!strcasecmp_P(tok, PSTR("OFF"))) {
 				zone_dst[i] = DST_OFF;
 			} else if (!strcasecmp_P(tok, PSTR("US"))) {
@@ -888,16 +921,9 @@ void __ATTR_NORETURN__ main(void) {
 				zone_dst[i] = DST_AU;
 			} else if (!strcasecmp_P(tok, PSTR("NZ"))) {
 				zone_dst[i] = DST_NZ;
-			} else goto fail;
+			} else sd_fail();
 		}
 	}
-	goto done;
-
-	fail:
-		LED_PORT.OUTSET = SD_ERR_bm;
-		while(1) wdt_reset(); // Die hard
-
-	done:
 
 	while(1) {
 		// The big, main loop. Our tasks:
@@ -926,7 +952,7 @@ void __ATTR_NORETURN__ main(void) {
 			// A DMA transfer completed, so we must at least ACK it.
 			// which channel?
 			unsigned char chan = (EDMA.INTFLAGS & EDMA_CH0TRNFIF_bm)?0:1;
-                	EDMA.INTFLAGS |= chan?EDMA_CH2TRNFIF_bm:EDMA_CH0TRNFIF_bm; // ack
+			EDMA.INTFLAGS |= chan?EDMA_CH2TRNFIF_bm:EDMA_CH0TRNFIF_bm; // ack
 
 			if (!playing) {
 				// This just means the last block finished.
@@ -946,7 +972,7 @@ void __ATTR_NORETURN__ main(void) {
 					else if (converted_hour == 0) converted_hour = 12;
 
 					if (chiming++ < converted_hour + 1) {
-						if (!play_file_maybe(P("STROKE"))) {
+						if (!play_file(P("STROKE"))) {
 							// skip everything that follows
 							continue;
 						}
@@ -957,13 +983,7 @@ void __ATTR_NORETURN__ main(void) {
 				}
 			} else {
 				// playing
-				unsigned int cnt;
-				if (pf_read((void*)(audio_buf[chan]), sizeof(audio_buf[chan]), &cnt) != FR_OK) {
-					// abort
-					playing = 0;
-					LED_PORT.OUTSET = SD_ERR_bm;
-					continue;
-				}
+				unsigned int cnt = read_audio((void*)(audio_buf[chan]), sizeof(audio_buf[chan]));
 				if (cnt == 0) {
 					// There was no data in the final read, so don't bother with it.
 					playing = 0;

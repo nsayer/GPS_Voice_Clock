@@ -45,8 +45,8 @@ source tree has the files to perform Westminster Quarters.
 The chimes can be independently turned on and off with dip switch 3. If the time messaging is turned on when it's time
 to chime, the chime will be skipped.
 
-The audio files are little-endian 16 bit unsigned 8 kHz mono raw audio samples. You can create them from some other format with sox. The
-command line arguments for the output should be -t raw -c 1 -e unsigned -b 16 -r 8000 -L.
+The audio files are µ-law encoded 8 bit 8 kHz mono raw audio samples. You can create them from some other format with sox. The
+command line arguments for the output should be -t raw -c 1 -e mu-law -b 8 -r 8000.
 
 The SD_audio.zip file in this repository can be unpacked into the top directory of a suitably formatted card. If chimes are desired, then one of the chime zip files can be unzipped to the same place.
 
