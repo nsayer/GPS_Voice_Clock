@@ -4,6 +4,9 @@ PROGRAMMER = atmelice_pdi
 
 OUT=GPS_Voice_Clock
 
+DISK_TYPE=sd
+#DISK_TYPE=spi
+
 CHIP = atxmega32e5
 
 CC = avr-gcc
@@ -22,7 +25,7 @@ all:	$(OUT).hex $(OUT).hex
 %.hex: %.elf
 	$(OBJCPY) -j .text -j .data -O ihex $^ $@
 
-GPS_Voice_Clock.elf: GPS_Voice_Clock.o pff.o diskio.o
+GPS_Voice_Clock.elf: GPS_Voice_Clock.o pff.o diskio_$(DISK_TYPE).o
 
 %.elf: %.o
 	$(CC) $(CFLAGS) -o $@ $^
