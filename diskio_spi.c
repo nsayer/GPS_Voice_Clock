@@ -1,6 +1,6 @@
 /*
 
-    Evil Simon
+    GPS Voice Clock
     Copyright (C) 2019 Nicholas W. Sayer
 
     This program is free software; you can redistribute it and/or modify
@@ -25,7 +25,7 @@
 #include <avr/io.h>
 #include <avr/wdt.h>
 #include "diskio.h"
-#include "Evil_Simon.h"
+#include “GPS_Voice_Clock.h"
 
 static inline __attribute__ ((always_inline)) unsigned char SPI_byte(unsigned char data) {
 	SPIC.DATA = data;
