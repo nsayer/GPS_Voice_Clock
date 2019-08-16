@@ -104,6 +104,8 @@ DSTATUS disk_initialize (void)
 {
 	DSTATUS stat = 0;
 
+	PORTC.PIN6CTRL = PORT_OPC_PULLUP_gc; // pull card DO pin up
+
 	// enable SPI, mode 0, master, 250 kHz
 	SPIC.CTRL = SPI_ENABLE_bm | SPI_MASTER_bm | SPI_MODE_0_gc | SPI_PRESCALER_DIV128_gc;
 

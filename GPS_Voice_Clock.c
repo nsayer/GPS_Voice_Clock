@@ -772,7 +772,6 @@ void __ATTR_NORETURN__ main(void) {
 
 	PORTC.OUTSET = _BV(3) | _BV(4); // !SD_CS and TXD default to high
 	PORTC.DIRSET = _BV(3) | _BV(4) | _BV(5) | _BV(7); // TXD and most of SPI is output
-	PORTC.PIN6CTRL = PORT_OPC_PULLUP_gc; // pull card DO pin up
 
 	// Trigger an interrupt on the rising edge of PPS.
 	PORTC.PIN0CTRL = PORT_ISC_RISING_gc;
