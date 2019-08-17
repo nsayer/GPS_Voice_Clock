@@ -125,7 +125,8 @@ unsigned char tick_cleared;
 unsigned int utc_ref_year;
 unsigned char utc_ref_mon;
 unsigned char utc_ref_day;
-unsigned char playing;
+unsigned char audio_playing;
+unsigned char more_audio;
 
 char intro_filename[16], hour_filename[16], minute_filename[16], second_filename[16];
 #ifdef AMPM
@@ -618,29 +619,21 @@ unsigned long ticks() {
 
 static unsigned char check_button() {
 	unsigned long now = ticks();
-	if (debounce_time != 0 && now - debounce_time < DEBOUNCE_TICKS) {
-		// We don't pay any attention to the buttons during debounce time.
-		return 0;
-	} else {
-		debounce_time = 0; // debounce is over
-	}
 	unsigned char status = PORT_SW & BTN_0_bm;
 	status ^= BTN_0_bm; // invert the button - 0 means down.
-	if (!((button_down == 0) ^ (status == 0))) return 0; // either no button is down, or a button is still down
-
-	// Something *changed*, which means we must now start a debounce interval.
-	debounce_time = now;
-	if (!debounce_time) debounce_time++; // it's not allowed to be zero
-
-	if (!button_down && status) {
-		button_down = 1; // a button has been pushed
-		return 1;
-	}
-	if (button_down && !status) {
-		button_down = 0; // a button has been released
+	if ((button_down == 0) ^ (status == 0)) {
+		// It changed. It must stay stable for a debounce period before we report.
+		button_down = status;
+		debounce_time = now;
+		if (debounce_time == 0) debounce_time++; // it can't be zero
 		return 0;
 	}
-	__builtin_unreachable(); // we'll never get here.
+	if (debounce_time == 0) return 0; // we're not waiting to report
+	if (now - debounce_time > DEBOUNCE_TICKS) {
+		debounce_time = 0; // debounce ended without change.
+		return status;
+	}
+	return 0;
 }
 
 static void sd_fail() {
@@ -686,6 +679,43 @@ static size_t read_audio(void* buf, size_t len) {
 	return cnt * 2;
 }
 
+// Returns 1 if playback is still in progress, 0 if stopped/finished.
+static unsigned char audio_poll(void) {
+	// Is there anything to do?
+	if (!audio_playing) return 0; // duh.
+	if (!(EDMA.INTFLAGS & (EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm))) return 1;
+
+	// A DMA transfer completed, so we must at least ACK it.
+	// which channel?
+	unsigned char chan = (EDMA.INTFLAGS & EDMA_CH0TRNFIF_bm)?0:1;
+	EDMA.INTFLAGS |= chan?EDMA_CH2TRNFIF_bm:EDMA_CH0TRNFIF_bm; // ack
+
+	if (!more_audio) {
+		// If there's no more file reading to do, we may still
+		// need to wait for the other buffer before marking
+		// playback all the way done.
+		if ((EDMA.STATUS & (EDMA_CH2BUSY_bm | EDMA_CH0BUSY_bm)) == 0) {
+			DACA.CTRLA &= ~(DAC_CH0EN_bm);
+			audio_playing = 0;
+		}
+		return audio_playing;
+	}
+	unsigned int cnt = read_audio((void *)(audio_buf[chan]), sizeof(audio_buf[chan]));
+	if (cnt == 0) {
+		// There was no data in the final read, so don't bother with it.
+		more_audio = 0;
+		return 1;
+	}
+	(chan?&(EDMA.CH2):&(EDMA.CH0))->TRFCNT = cnt;
+	(chan?&(EDMA.CH2):&(EDMA.CH0))->CTRLA |= EDMA_CH_REPEAT_bm; // continue with this buffer
+	if (cnt != sizeof(audio_buf[chan])) {
+		// This is the last audio chunk, so stop reading the file.
+		more_audio = 0;
+	}
+	return 1;
+}
+
+// Returns 0 if playback began, 0 if the file could not be opened (didn't exist).
 static unsigned char play_file(char *filename) {
 	// Force an abort by turning off enable and repeat.
 	EDMA.CH0.CTRLA &= ~(EDMA_CH_ENABLE_bm | EDMA_CH_REPEAT_bm);
@@ -698,6 +728,8 @@ static unsigned char play_file(char *filename) {
 	// If we aborted, then the start address will be wrong and must be reset.
 	EDMA.CH0.ADDR = (unsigned int)&(audio_buf[0]);
 	EDMA.CH2.ADDR = (unsigned int)&(audio_buf[1]);
+	EDMA.CH0.DESTADDR = (unsigned int)&(DACA.CH0DATA);
+	EDMA.CH2.DESTADDR = (unsigned int)&(DACA.CH0DATA);
 
 	// first, make sure the transfer complete flags are clear.
 	EDMA.INTFLAGS |= EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm;
@@ -705,6 +737,8 @@ static unsigned char play_file(char *filename) {
 	unsigned int cnt = read_audio((void*)(audio_buf[0]), sizeof(audio_buf[0]));
 	if (!cnt) return 0; // empty file - we're done
 
+	audio_playing = 1;
+	DACA.CTRLA |= DAC_CH0EN_bm;
 	EDMA.CH0.TRFCNT = cnt;
 	EDMA.CH0.CTRLA |= EDMA_CH_ENABLE_bm; // start
 	if (cnt != sizeof(audio_buf[0])) {
@@ -720,7 +754,7 @@ static unsigned char play_file(char *filename) {
 	if (cnt == sizeof(audio_buf[1])) {
 		// If this isn't the last block, then tell the top layer to
 		// continue filling buffers as they become empty.
-		playing = 1;
+		more_audio = 1;
 	}
 	return 0;
 }
@@ -869,7 +903,8 @@ void __ATTR_NORETURN__ main(void) {
 	second_start_tick = 0;
 	new_second = 0;
 	tick_cleared = 0;
-	playing = 0;
+	audio_playing = 0;
+	more_audio = 0;
 	*intro_filename = 0;
 	*hour_filename = 0;
 	*minute_filename = 0;
@@ -953,57 +988,33 @@ void __ATTR_NORETURN__ main(void) {
 		}
 
 		// 3. Fill completed audio buffers if background audio playback is in progress
-		if (EDMA.INTFLAGS & (EDMA_CH0TRNFIF_bm | EDMA_CH2TRNFIF_bm)) {
-			// A DMA transfer completed, so we must at least ACK it.
-			// which channel?
-			unsigned char chan = (EDMA.INTFLAGS & EDMA_CH0TRNFIF_bm)?0:1;
-			EDMA.INTFLAGS |= chan?EDMA_CH2TRNFIF_bm:EDMA_CH0TRNFIF_bm; // ack
-
-			if (!playing) {
-				// This just means the last block finished.
-				if (chiming) {
-					// We finished either the chimes or a stroke. Time to play more strokes, perhaps?
-					// chiming is equal to 1 before the first "stroke". But if it's not minute 0,
-					// we want to just end it here.
-					if (chiming == 1 && minute != 0) {
-						// If it's not minute zero, stop now.
-						chiming = 0;
-						PORTD.OUTCLR = AUPWR_bm;
-						continue;
-					}
-					// The strokes are in AM/PM style hours, so make that up.
-					unsigned char converted_hour = hour; // make an AM/PM hour
-					if (converted_hour > 12) converted_hour -= 12;
-					else if (converted_hour == 0) converted_hour = 12;
-
-					if (chiming++ < converted_hour + 1) {
-						if (!play_file(P("STROKE"))) {
-							// skip everything that follows
-							continue;
-						}
-						// else fall through
-					}
-					chiming = 0; // We're done chiming now
-					PORTD.OUTCLR = AUPWR_bm; // Speaker back off
-				}
-			} else {
-				// playing
-				unsigned int cnt = read_audio((void*)(audio_buf[chan]), sizeof(audio_buf[chan]));
-				if (cnt == 0) {
-					// There was no data in the final read, so don't bother with it.
-					playing = 0;
+		if (!audio_poll()) {
+			// This just means the last block finished.
+			if (chiming) {
+				// We finished either the chimes or a stroke. Time to play more strokes, perhaps?
+				// chiming is equal to 1 before the first "stroke". But if it's not minute 0,
+				// we want to just end it here.
+				if (chiming == 1 && minute != 0) {
+					// If it's not minute zero, stop now.
+					chiming = 0;
+					PORTD.OUTCLR = AUPWR_bm;
 					continue;
 				}
-				(chan?&(EDMA.CH2):&(EDMA.CH0))->TRFCNT = cnt;
-				(chan?&(EDMA.CH2):&(EDMA.CH0))->CTRLA |= EDMA_CH_REPEAT_bm; // continue with this buffer
-				if (cnt != sizeof(audio_buf[chan])) {
-					// This is the last audio chunk, so we are done. Stop paying attention.
-					// DMA will stop after this buffer plays because the other one won't have had
-					// REPEAT turned on.
-					playing = 0;
+				// The strokes are in AM/PM style hours, so make that up.
+				unsigned char converted_hour = hour; // make an AM/PM hour
+				if (converted_hour > 12) converted_hour -= 12;
+				else if (converted_hour == 0) converted_hour = 12;
+
+				if (chiming++ < converted_hour + 1) {
+					if (!play_file(P("STROKE"))) {
+						// skip everything that follows
+						continue;
+					}
+					// else fall through
 				}
+				chiming = 0; // We're done chiming now
+				PORTD.OUTCLR = AUPWR_bm; // Speaker back off
 			}
-			continue;
 		}
 
 		// 4. Handle serial sentence completions
