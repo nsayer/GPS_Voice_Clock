@@ -25,7 +25,7 @@
 #include <avr/io.h>
 #include <avr/wdt.h>
 #include "diskio.h"
-#include “GPS_Voice_Clock.h"
+#include "GPS_Voice_Clock.h"
 
 static inline __attribute__ ((always_inline)) unsigned char SPI_byte(unsigned char data) {
 	SPIC.DATA = data;
