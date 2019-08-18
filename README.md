@@ -21,7 +21,7 @@ updating the SPI flash chip. If you don't, then the processor may attempt to tal
 data corruption.
 
 DIP switch 3 selects whether to perform chimes or not. Switches 2 to 0 select the time zone. The available
-time zone selections are governed by a configuration file (called CONFIG.TXT) in the top level of the SD card. The config
+time zone selections are governed by a configuration file (called CONFIG.TXT) in the top level of the filesystem. The config
 file has 8 lines. Each line is a comma separated list of 3 fields. The first field is a single character representing the
 first letter of the name of the zone file pair in the ZONE directory. The second field is the offset from UTC for standard
 time in the zone. The third field is a string for the DST configuration for the zone. The available strings are "OFF", "US",
@@ -33,7 +33,7 @@ The button toggles the audio on and off. The two lights on the board indicate a 
 card errors can either be failures to mount the card, config file format errors (which are fatal), or missing files (which,
 generally, are not).
 
-The flash storage should be formatted as a FAT16 or FAT32 filesystem in an MBR partition. All of the directory and file names should be uppercase.
+The flash storage should be formatted as a FAT12, FAT16 or FAT32 filesystem in an MBR partition. All of the directory and file names should be uppercase.
 
 The filesystem has the following main directories defined: "ZONE", "HOUR", "MINUTE" and "SECOND".
 
