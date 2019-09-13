@@ -4,8 +4,8 @@ PROGRAMMER = atmelice_pdi
 
 OUT=GPS_Voice_Clock
 
-DISK_TYPE=sd
-#DISK_TYPE=spi
+DISK_TYPE=spi
+#DISK_TYPE=sd
 
 CHIP = atxmega32e5
 
