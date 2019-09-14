@@ -23,7 +23,6 @@
 // skeleton for SPI flash chip I/O.
 
 #include <avr/io.h>
-#include <avr/wdt.h>
 #include "diskio.h"
 #include "GPS_Voice_Clock.h"
 
