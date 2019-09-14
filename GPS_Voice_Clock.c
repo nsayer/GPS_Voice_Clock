@@ -812,7 +812,8 @@ void __ATTR_NORETURN__ main(void) {
 	PORTC.INTCTRL = PORT_INTLVL_MED_gc;
 	PORTC.INTMASK = _BV(0);
 
-	PORTD.OUTSET = CRDPWR_bm | AUPWR_bm; // start with SD power and audio turned off
+	PORTD.OUTSET = CRDPWR_bm; // start with SD power... and audio turned off
+	PORTD.OUTCLR = AUPWR_bm; // and audio turned off
 	PORTD.DIRSET = _BV(0) | _BV(1) | _BV(6) | _BV(7); // power switches and LEDS are out
 
 	rx_str_len = 0;
