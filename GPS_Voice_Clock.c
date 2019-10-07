@@ -695,8 +695,7 @@ static unsigned char audio_poll(void) {
 		// need to wait for the other buffer before marking
 		// playback all the way done.
 		if ((EDMA.STATUS & (EDMA_CH2BUSY_bm | EDMA_CH0BUSY_bm)) == 0) {
-			DACA.CH0DATA = 0x7fff; // Leave it at the midpoint for bias
-			DACA.CTRLB |= DAC_CH0TRIG_bm; // send it
+			DACA.CH0DATA = 0x7fff; // Leave it at the midpoint for bias. The timer will grab this value.
 			audio_playing = 0;
 		}
 		return audio_playing;
