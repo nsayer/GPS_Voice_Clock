@@ -29,11 +29,11 @@ extern unsigned long ticks();
 // Port C - !CS
 #define CRDCS_bm _BV(4)
 // Pord D - !PWR
-#define CRDPWR_bm _BV(0)
 #define AUPWR_bm _BV(1)
 
 // The diagnostic LEDs
 #define LED_PORT PORTD
+#define FIX_bm _BV(5)
 #define GPS_ERR_bm _BV(6)
 #define SD_ERR_bm _BV(7)
 
@@ -47,5 +47,3 @@ extern unsigned long ticks();
 
 #define ASSERT_CS (PORTC.OUTCLR = CRDCS_bm)
 #define DEASSERT_CS (PORTC.OUTSET = CRDCS_bm)
-#define SDPWR_ON (PORTD.OUTCLR = CRDPWR_bm)
-#define SDPWR_OFF (PORTD.OUTSET = CRDPWR_bm)

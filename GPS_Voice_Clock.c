@@ -35,6 +35,9 @@
 #include "GPS_Voice_Clock.h"
 #include "pff.h"
 
+// Do we have a PX1100T or a Venus838LPx-T?
+#define PX1100T
+
 // WWV mode has plain ticks for 59 seconds and a long beep at zero.
 // Also, only a single time announcement at 50 seconds.
 //#define WWV
@@ -50,9 +53,15 @@
 // 32 MHz
 #define F_CPU (32000000UL)
 
+#ifdef PX1100T
+// CLK2X = 0. For 115200 baud @ 32 MHz: 
+#define BSEL (131)
+#define BSCALE (-3)
+#else
 // CLK2X = 0. For 9600 baud @ 32 MHz: 
 #define BSEL (12)
 #define BSCALE (4)
+#endif
 
 // The serial buffer length
 #define RX_BUF_LEN (96)
@@ -489,50 +498,65 @@ static inline void handleGPS(const unsigned char *rx_sentence, const unsigned in
 	}
 	  
 	const char *ptr = (char *)rx_sentence;
-	if (!strncmp_P(ptr, PSTR("$GPRMC"), 6)) {
-		// $GPRMC,172313.000,A,xxxx.xxxx,N,xxxxx.xxxx,W,0.01,180.80,260516,,,D*74\x0d\x0a
-		ptr = skip_commas(ptr, 1);
-		if (ptr == NULL) return; // not enough commas
-		char h = (ptr[0] - '0') * 10 + (ptr[1] - '0');
-		unsigned char min = (ptr[2] - '0') * 10 + (ptr[3] - '0');
-		unsigned char s = (ptr[4] - '0') * 10 + (ptr[5] - '0');
-		ptr = skip_commas(ptr, 1);
-		if (ptr == NULL) return; // not enough commas
-		gps_locked = *ptr == 'A'; // A = AOK.
-		ptr = skip_commas(ptr, 7);
-		if (ptr == NULL) return; // not enough commas
-		unsigned char d = (ptr[0] - '0') * 10 + (ptr[1] - '0');
-		unsigned char mon = (ptr[2] - '0') * 10 + (ptr[3] - '0');
-		unsigned int y = (ptr[4] - '0') * 10 + (ptr[5] - '0');
+        if (!strncmp_P(ptr, PSTR(
+#ifdef PX1100T
+                                        "$GNZDA"
+#else
+                                        "$GPZDA"
+#endif
+                                        ), 6)) {
+                // $GPZDA,124502.000,31,12,2020,00,00*44\x0d\x0a
+                ptr = skip_commas(ptr, 1);
+                if (ptr == NULL) return; // not enough commas
+                char h = (ptr[0] - '0') * 10 + (ptr[1] - '0');
+                unsigned char min = (ptr[2] - '0') * 10 + (ptr[3] - '0');
+                unsigned char s = (ptr[4] - '0') * 10 + (ptr[5] - '0');
+                ptr = skip_commas(ptr, 1);
+                if (ptr == NULL) return; // not enough commas
+                unsigned char d = (unsigned char)atoi(ptr);
+                ptr = skip_commas(ptr, 1);
+                if (ptr == NULL) return; // not enough commas
+                unsigned char mon = (unsigned char)atoi(ptr);
+                ptr = skip_commas(ptr, 1);
+                if (ptr == NULL) return; // not enough commas
+                unsigned int y = atoi(ptr);
 
-		// We must turn the two digit year into the actual A.D. year number.
-		// As time goes forward, we can keep a record of how far time has gotten,
-		// and assume that time will always go forwards. If we see a date ostensibly
-		// in the past, then it "must" mean that we've actually wrapped and need to
-		// add 100 years. We keep this "reference" date in sync with the GPS receiver,
-		// as it uses the reference date to control the GPS week rollover window.
-		y += 2000;
-		while (y < utc_ref_year) y += 100; // If it's in the "past," assume time wrapped on us.
+                if (utc_ref_year != 0 && y != utc_ref_year) {
+                        // Once a year, we should update the refence date in the receiver. If we're running on New Years,
+                        // then that's probably when it will happen, but anytime is really ok. We just don't want to do
+                        // it a lot for fear of burning the flash out in the GPS receiver.
+                        updateUTCReference(y, mon, d);
+                        utc_ref_year = y;
+                        utc_ref_mon = mon;
+                        utc_ref_day = d;
+                }
 
-		if (utc_ref_year != 0 && y != utc_ref_year) {
-			// Once a year, we should update the refence date in the receiver. If we're running on New Years,
-			// then that's probably when it will happen, but anytime is really ok. We just don't want to do
-			// it a lot for fear of burning the flash out in the GPS receiver.
-			updateUTCReference(y, mon, d);
-			utc_ref_year = y;
-			utc_ref_mon = mon;
-			utc_ref_day = d;
-		}
-
-		// The problem is that our D/M/Y is UTC, but DST decisions are made in the local
-		// timezone. We can adjust the day against standard time midnight, and
-		// that will be good enough. Don't worry that this can result in d being either 0
-		// or past the last day of the month. Neither of those will match the "decision day"
-		// for DST, which is the only day on which the day of the month is significant.
-		if (h + zone_hour[tz] < 0) d--;
-		if (h + zone_hour[tz] > 23) d++;
-		unsigned char dst_flags = calculateDST(d, mon, y);
-		handle_time(h, min, s, dst_flags);
+                // The problem is that our D/M/Y is UTC, but DST decisions are made in the local
+                // timezone. We can adjust the day against standard time midnight, and
+                // that will be good enough. Don't worry that this can result in d being either 0
+                // or past the last day of the month. Neither of those will match the "decision day"
+                // for DST, which is the only day on which the day of the month is significant.
+                if (h + zone_hour[tz] < 0) d--;
+                if (h + zone_hour[tz] > 23) d++;
+                unsigned char dst_flags = calculateDST(d, mon, y);
+                handle_time(h, min, s, dst_flags);
+        } else if (!strncmp_P(ptr, PSTR(
+#ifdef PX1100T
+                                        "$GNRMC"
+#else
+                                        "$GPRMC"
+#endif
+                                        ), 6)) {
+                // $GPRMC,172313.000,A,xxxx.xxxx,N,xxxxx.xxxx,W,0.01,180.80,260516,,,D*74\x0d\x0a
+                ptr = skip_commas(ptr, 2);
+                if (ptr == NULL) return; // not enough commas
+                gps_locked = *ptr == 'A'; // A = AOK.
+/*
+ * We have no way to report this, but...
+                ptr = skip_commas(ptr, 10);
+                if (ptr == NULL) return; // not enough commas
+                gps_mode = *ptr;
+*/
 	}
 }
 
@@ -551,6 +575,8 @@ ISR(PORTC_INT_vect) {
 	if (gps_locked && !chiming) {
 		PORTD.DIRSET = _BV(4); // turn on the tick
 	}
+	if (gps_locked)
+		LED_PORT.OUTTGL = FIX_bm; // toggle FIX
 }
 
 // serial receive interrupt.
@@ -638,6 +664,7 @@ static unsigned char check_button() {
 
 static void sd_fail() {
 	LED_PORT.OUTSET = SD_ERR_bm;
+	LED_PORT.OUTCLR = FIX_bm;
 	while(1) wdt_reset(); // Die hard
 }
 	
@@ -811,9 +838,8 @@ void __ATTR_NORETURN__ main(void) {
 	PORTC.INTCTRL = PORT_INTLVL_MED_gc;
 	PORTC.INTMASK = _BV(0);
 
-	PORTD.OUTSET = CRDPWR_bm; // start with SD power... and audio turned off
 	PORTD.OUTCLR = AUPWR_bm; // and audio turned off
-	PORTD.DIRSET = _BV(0) | _BV(1) | _BV(6) | _BV(7); // power switches and LEDS are out
+	PORTD.DIRSET = _BV(0) | _BV(1) | _BV(5) | _BV(6) | _BV(7); // power switches and LEDS are out
 
 	rx_str_len = 0;
 	tx_buf_head = tx_buf_tail = 0;
@@ -1044,7 +1070,7 @@ void __ATTR_NORETURN__ main(void) {
 		if (gps_locked) {
 			LED_PORT.OUTCLR = GPS_ERR_bm;
 		} else {
-			LED_PORT.OUTSET = GPS_ERR_bm;
+			LED_PORT.OUTSET = GPS_ERR_bm | FIX_bm; // FIX = on for lost GPS
 			continue; // prevent everything that follows
 		}
 
